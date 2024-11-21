@@ -68,7 +68,9 @@ class UnifiedChatAPI:
 class SimpleMemory:
     """Simple in-memory storage for task and answer traces."""
 
-    def __init__(self, task_trace: List[str] = [], answer_trace: List[str] = []):
+    def __init__(
+        self, task_trace: List[str] = [], answer_trace: List[str] = []
+    ):
         self.task_trace = task_trace
         self.answer_trace = answer_trace
 
@@ -231,12 +233,10 @@ TASK
             try:
                 self.perform_reflection(task, indent_level)
                 action = self.decide_action(task, recursion, indent_level)
-                result = self.execute_action(
-                    action, task, indent_level
-                )
+                result = self.execute_action(action, task, indent_level)
 
                 if result is not None:
-                    self.summarize_large_observations()
+                    # self.summarize_large_observations()
                     return result
 
             except Exception as e:
@@ -314,9 +314,9 @@ TASK
             elif action.request == "decomposition":
                 self.handle_decomposition(action, indent_level)
                 return None
-            elif action.request == "final_answer":
-                self.handle_final_answer(task, action, indent_level)
-                return action.argument
+            elif action.request == "end_task":
+                self.handle_end_task(task, action, indent_level)
+                return None
             else:
                 raise ValueError(f"Unknown action request: {action.request}")
 
@@ -513,16 +513,16 @@ RESPONSE FORMAT
             return None
 
     # Final Answer Tool
-    def handle_final_answer(
+    def handle_end_task(
         self, task: str, action: AgentAction, indent_level: int
     ):
-        """Handle the final answer action."""
+        """Handle the end task action."""
         # Update memory
         self.memory.add_interaction(task, action.argument)
-        final_answer_msg = self.format_message(
-            action.argument, "FINAL ANSWER", indent_level
+        end_task_msg = self.format_message(
+            "Task completed.", "END OF TASK", indent_level
         )
-        self.context += final_answer_msg
+        self.context += end_task_msg
         os.system("cls" if os.name == "nt" else "clear")
         print(self.context)
 
@@ -545,7 +545,7 @@ RESPONSE FORMAT
             "OBSERVATION": "\033[93m",
             "ERROR": "\033[91m",
             "SUBTASK": "\033[95m",
-            "FINAL ANSWER": "\033[96m",
+            "END OF TASK": "\033[96m",
             "ARGUMENT": "\033[90m",
             "GENERATED RESPONSE TO SUBTASKS": "\033[96m",
             "SUMMARY": "\033[97m",
@@ -581,7 +581,7 @@ RESPONSE FORMAT
                 {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
-                    "content": f"Please provide a concise summary of the following code using natural language:\n{text}",
+                    "content": f"Please provide a concise summary of the following code using natural language:\n\n{text}",
                 },
             ]
         )
@@ -596,7 +596,7 @@ if __name__ == "__main__":
         shutil.rmtree("src/")
     shutil.copytree("src_original/", "src/")
 
-    GPT_MODEL = "gpt-4o-mini"
+    GPT_MODEL = "gpt-4o"
     OLLAMA_MODEL = "qwen2.5-coder:7b"
 
     SELECTED_MODEL = GPT_MODEL
@@ -611,6 +611,7 @@ At the end of the task, I will personally review the code and evaluate your work
 in the book must be rendered correctly.
 
 I recommend you to start the task by using the observe_repository tool to get a view of the current code.
+Then you need to start changing the code by using the tools.
 Use the same style and structure as in the currently implemented code.
 """
 

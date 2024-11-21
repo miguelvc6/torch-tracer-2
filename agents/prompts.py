@@ -43,7 +43,7 @@ AVAILABLE ASSISTANTS
     to solve them recursively. Use only for complex questions", "Arguments": question - str}
 
 AVAILABLE ACTION
-- final_answer: {"Description": "Final answer for the user. Must answer the question asked.", "Arguments": "answer - str"}
+- end_task: {"Description": "Final answer for the user. Must answer the question asked.", "Arguments": "answer - str"}
 
 RESPONSE FORMAT
 REFLECTION >> <Fill>
@@ -103,7 +103,7 @@ AVAILABLE ASSISTANTS
 
 ACTION_SYSTEM_PROMPT_02 = """
 AVAILABLE ACTION
-- final_answer: {"Description": "Final answer for the user. Must answer the question asked.", "Arguments": "answer - str"}
+- end_task: {"Description": "The task is complete. Return null.", "Arguments": null}
 
 RESPONSE FORMAT
 {
@@ -163,7 +163,7 @@ EXAMPLES:
 
 9. Final answer:
 {
-  "request": "final_answer",
-  "argument": "Based on the repository content, the ray tracer implements motion blur in section 2."
+  "request": "end_task",
+  "argument": null
 }
 """

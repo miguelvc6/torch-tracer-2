@@ -8,6 +8,7 @@ from camera import Camera
 from config import device
 from materials import MaterialType
 from sphere import SphereList
+
 # Choose device
 print(f"Using device: {device}")
 
