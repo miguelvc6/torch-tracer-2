@@ -23,7 +23,9 @@ from pydantic import BaseModel, ValidationError
 class UnifiedChatAPI:
     """Unified interface for OpenAI and Ollama chat APIs."""
 
-    def __init__(self, model="gpt-4o-mini", openai_api_key=None, verbosity=0):
+    def __init__(
+        self, model="gpt-4o-mini", openai_api_key=None, verbosity=False
+    ):
         self.model = model
         self.api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
         self.api = self._determine_api()
@@ -39,7 +41,7 @@ class UnifiedChatAPI:
         elif self.api == "ollama":
             self.client = None
 
-        if self.verbosity == 2:
+        if self.verbosity:
             os.makedirs("logs/", exist_ok=True)
             self.log_file = f"logs/log_{self.date_hour}.json"
         else:
@@ -54,24 +56,22 @@ class UnifiedChatAPI:
 
     def log_interaction(self, messages, answer):
         """Log the interaction to the log file."""
-        with open(self.log_file, "a", encoding="utf-8") as f:
-            json.dump({"messages": messages, "answer": answer}, f)
-            f.write("\n")
+        data = {"messages": messages, "answer": answer}
+        with open(self.log_file, "w", encoding="utf-8") as f:
+            json_str = json.dumps(messages, indent=4)
+            json_str_with_newlines = json_str.replace("\\n", "\n")
+            f.write(json_str_with_newlines)
 
     def chat(self, messages):
         """Wrapper for chat API."""
         if self.api == "openai":
             answer = self._openai_chat(messages)
-            if self.verbosity == 1:
-                print(answer)
-            elif self.verbosity == 2:
+            if self.verbosity:
                 self.log_interaction(messages, answer)
             return answer
         elif self.api == "ollama":
             answer = self._ollama_chat(messages)
-            if self.verbosity == 1:
-                print(answer)
-            elif self.verbosity == 2:
+            if self.verbosity:
                 self.log_interaction(messages, answer)
             return answer
         else:
@@ -251,7 +251,11 @@ TASK
         self, task: str, recursion: bool = False, indent_level: int = 0
     ) -> str:
         """Run the ReAct agent to solve a task."""
-        if not recursion:
+        if (
+            not recursion
+            and self.memory.task_trace
+            and self.memory.answer_trace
+        ):
             self.context = self.memory.get_context()
             print("\n")
 
