@@ -261,11 +261,11 @@ TASK
                 action = self.decide_action(task, recursion, indent_level)
                 result = self.execute_action(action, task, indent_level)
 
-                if result is not None:
-                    pass
+                if result == "end_task":
+                    break
+                elif result is not None:
                     # self.summarize_large_observations()
-                elif result == "end_task":
-                    return result
+                    pass
 
             except Exception as e:
                 error_msg = self.format_message(str(e), "ERROR", indent_level)
@@ -546,7 +546,9 @@ RESPONSE FORMAT
     ) -> str:
         """Handle the end task action."""
         self.memory.add_interaction(task, action.argument)
-        end_task_msg = self.format_message("Task completed.", "END OF TASK", indent_level)
+        end_task_msg = self.format_message(
+            "Task completed.", "END OF TASK", indent_level
+        )
         self.context += end_task_msg
         os.system("cls" if os.name == "nt" else "clear")
         print(self.context)
@@ -621,7 +623,7 @@ if __name__ == "__main__":
         shutil.rmtree("src/")
     shutil.copytree("src_original/", "src/")
 
-    GPT_MODEL = "gpt-4o-mini"
+    GPT_MODEL = "gpt-4o-mini"  # gpt-4o-2024-11-20
     OLLAMA_MODEL = "qwen2.5-coder:7b"
 
     SELECTED_MODEL = GPT_MODEL
@@ -636,7 +638,7 @@ At the end of the task, I will personally review the code and evaluate your work
 in the book must be rendered correctly.
 
 I recommend you to start the task by using the observe_repository tool to get a view of the current code.
-Then you need to start changing the code by using the tools.
+Then you need you should start implementing the code of the book's sections sequentially.
 Use the same style and structure as in the currently implemented code.
 """
 
