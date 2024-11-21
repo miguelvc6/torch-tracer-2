@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
+from datetime import datetime
 from typing import List, Optional
 
 import ollama
@@ -22,10 +23,12 @@ from pydantic import BaseModel, ValidationError
 class UnifiedChatAPI:
     """Unified interface for OpenAI and Ollama chat APIs."""
 
-    def __init__(self, model="gpt-4o-mini", openai_api_key=None):
+    def __init__(self, model="gpt-4o-mini", openai_api_key=None, verbosity=0):
         self.model = model
         self.api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
         self.api = self._determine_api()
+        self.verbosity = verbosity
+        self.date_hour = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         if self.api == "openai":
             if not self.api_key:
                 raise ValueError(
@@ -36,6 +39,12 @@ class UnifiedChatAPI:
         elif self.api == "ollama":
             self.client = None
 
+        if self.verbosity == 2:
+            os.makedirs("logs/", exist_ok=True)
+            self.log_file = f"logs/log_{self.date_hour}.json"
+        else:
+            self.log_file = None
+
     def _determine_api(self):
         """Determine the API based on the model name."""
         if self.model.startswith("gpt-") or self.model.startswith("o1-"):
@@ -43,12 +52,28 @@ class UnifiedChatAPI:
         else:
             return "ollama"
 
+    def log_interaction(self, messages, answer):
+        """Log the interaction to the log file."""
+        with open(self.log_file, "a", encoding="utf-8") as f:
+            json.dump({"messages": messages, "answer": answer}, f)
+            f.write("\n")
+
     def chat(self, messages):
         """Wrapper for chat API."""
         if self.api == "openai":
-            return self._openai_chat(messages)
+            answer = self._openai_chat(messages)
+            if self.verbosity == 1:
+                print(answer)
+            elif self.verbosity == 2:
+                self.log_interaction(messages, answer)
+            return answer
         elif self.api == "ollama":
-            return self._ollama_chat(messages)
+            answer = self._ollama_chat(messages)
+            if self.verbosity == 1:
+                print(answer)
+            elif self.verbosity == 2:
+                self.log_interaction(messages, answer)
+            return answer
         else:
             raise ValueError(
                 "Unsupported API. Please set the API to 'openai' or 'ollama'."
@@ -114,10 +139,11 @@ class AgentReAct:
         self,
         model="gpt-4o-mini",
         memory_path="agent_memory.json",
+        verbosity=0,
     ):
         """Initialize Agent with database path and model."""
         self.model = model
-        self.client = UnifiedChatAPI(model=self.model)
+        self.client = UnifiedChatAPI(model=self.model, verbosity=verbosity)
         self.context = ""
         self.memory_path = memory_path
         self.large_observations = []
@@ -236,7 +262,9 @@ TASK
                 result = self.execute_action(action, task, indent_level)
 
                 if result is not None:
+                    pass
                     # self.summarize_large_observations()
+                elif result == "end_task":
                     return result
 
             except Exception as e:
@@ -316,7 +344,7 @@ TASK
                 return None
             elif action.request == "end_task":
                 self.handle_end_task(task, action, indent_level)
-                return None
+                return "end_task"
             else:
                 raise ValueError(f"Unknown action request: {action.request}")
 
@@ -515,13 +543,10 @@ RESPONSE FORMAT
     # Final Answer Tool
     def handle_end_task(
         self, task: str, action: AgentAction, indent_level: int
-    ):
+    ) -> str:
         """Handle the end task action."""
-        # Update memory
         self.memory.add_interaction(task, action.argument)
-        end_task_msg = self.format_message(
-            "Task completed.", "END OF TASK", indent_level
-        )
+        end_task_msg = self.format_message("Task completed.", "END OF TASK", indent_level)
         self.context += end_task_msg
         os.system("cls" if os.name == "nt" else "clear")
         print(self.context)
@@ -596,7 +621,7 @@ if __name__ == "__main__":
         shutil.rmtree("src/")
     shutil.copytree("src_original/", "src/")
 
-    GPT_MODEL = "gpt-4o"
+    GPT_MODEL = "gpt-4o-mini"
     OLLAMA_MODEL = "qwen2.5-coder:7b"
 
     SELECTED_MODEL = GPT_MODEL
@@ -619,6 +644,7 @@ Use the same style and structure as in the currently implemented code.
         agent = AgentReAct(
             model=SELECTED_MODEL,
             memory_path="agent_memory_gpt.json",
+            verbosity=2,
         )
         agent.run_agent(task)
         agent.save_context_to_html("agent_context_gpt.html")

@@ -95,11 +95,13 @@ AVAILABLE TOOLS
     }
 """
 
-ACTION_SYSTEM_PROMPT_DECOMPOSITION = """
-AVAILABLE ASSISTANTS
-- decomposition: {"Description: "Divides a complex question into simpler sub-parts and calls agents \
-    to solve them recursively. Use only for complex questions", Arguments: question - str}
-"""
+# ACTION_SYSTEM_PROMPT_DECOMPOSITION = """
+# AVAILABLE ASSISTANTS
+# - decomposition: {"Description: "Divides a complex question into simpler sub-parts and calls agents \
+#     to solve them recursively. Use only for complex questions", Arguments: question - str}
+# """
+
+ACTION_SYSTEM_PROMPT_DECOMPOSITION = ""
 
 ACTION_SYSTEM_PROMPT_02 = """
 AVAILABLE ACTION
