@@ -166,6 +166,4 @@ EXAMPLES:
   "request": "final_answer",
   "argument": "Based on the repository content, the ray tracer implements motion blur in section 2."
 }
-
-
 """

@@ -2,3 +2,4 @@
 .vscode/
 .env
 MVC.ipynb
+agents/__pycache__/

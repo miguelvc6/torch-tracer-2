@@ -68,9 +68,9 @@ class UnifiedChatAPI:
 class SimpleMemory:
     """Simple in-memory storage for task and answer traces."""
 
-    def __init__(self):
-        self.task_trace = []
-        self.answer_trace = []
+    def __init__(self, task_trace: List[str] = [], answer_trace: List[str] = []):
+        self.task_trace = task_trace
+        self.answer_trace = answer_trace
 
     def add_interaction(self, task, answer):
         self.task_trace.append(task)
@@ -116,17 +116,21 @@ class AgentReAct:
         """Initialize Agent with database path and model."""
         self.model = model
         self.client = UnifiedChatAPI(model=self.model)
-        self.memory = self.load_memory()
         self.context = ""
         self.memory_path = memory_path
         self.large_observations = []
+        self.memory = self.load_memory()
 
     # Memory Management
     def load_memory(self):
         """Load the agent memory from a JSON file."""
         if os.path.exists(self.memory_path):
             with open(self.memory_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+                memory = json.load(f)
+                return SimpleMemory(
+                    task_trace=memory["task_trace"],
+                    answer_trace=memory["answer_trace"],
+                )
         else:
             return SimpleMemory()
 
@@ -228,7 +232,7 @@ TASK
                 self.perform_reflection(task, indent_level)
                 action = self.decide_action(task, recursion, indent_level)
                 result = self.execute_action(
-                    action, task, recursion, indent_level
+                    action, task, indent_level
                 )
 
                 if result is not None:
@@ -588,7 +592,8 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
 
     load_dotenv()
-
+    if os.path.exists("src/"):
+        shutil.rmtree("src/")
     shutil.copytree("src_original/", "src/")
 
     GPT_MODEL = "gpt-4o-mini"
@@ -601,7 +606,9 @@ I have an implementation of the ray tracer algorithm in PyTorch.
 It is based on the book 'Ray Tracing In One Weekend', where the code is written in C++.
 
 I want you to augment my code with additional features as described in the book 'Ray Tracing The Next Week', 
-the second book of the series.
+the second book of the series. You will be evaluated on the completeness and correctness of the implementation.
+At the end of the task, I will personally review the code and evaluate your work. The nine scenes that are rendered
+in the book must be rendered correctly.
 
 I recommend you to start the task by using the observe_repository tool to get a view of the current code.
 Use the same style and structure as in the currently implemented code.
