@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -118,6 +119,7 @@ class AgentReAct:
         self.memory = self.load_memory()
         self.context = ""
         self.memory_path = memory_path
+        self.large_observations = []
 
     # Memory Management
     def load_memory(self):
@@ -230,6 +232,7 @@ TASK
                 )
 
                 if result is not None:
+                    self.summarize_large_observations()
                     return result
 
             except Exception as e:
@@ -276,14 +279,18 @@ TASK
         """Execute the chosen action and handle the result."""
         try:
             result = None
+            large_output = False
+
             if action.request == "observe_book":
                 result = self.observe_book(int(action.argument))
             elif action.request == "run_main":
                 result = self.run_main()
             elif action.request == "observe_repository":
                 result = self.observe_repository()
+                large_output = True
             elif action.request == "observe_single_script":
                 result = self.observe_single_script(action.argument)
+                large_output = True
             elif action.request == "insert_code":
                 args = json.loads(action.argument)
                 result = self.insert_code(
@@ -314,6 +321,9 @@ TASK
                     str(result), "OBSERVATION", indent_level
                 )
                 self.context += obs_msg
+                if large_output:
+                    self.large_observations.append((obs_msg, indent_level))
+
         except Exception as e:
             error_msg = self.format_message(
                 f"Error executing {action.request}: {str(e)}",
@@ -526,14 +536,15 @@ RESPONSE FORMAT
     def color_text(self, text: str, action: str) -> str:
         """Colorize text based on the action."""
         color_codes = {
-            "REFLECTION": "\033[94m",  # Blue
-            "ACTION": "\033[92m",  # Green
-            "OBSERVATION": "\033[93m",  # Yellow
-            "ERROR": "\033[91m",  # Red
-            "SUBTASK": "\033[95m",  # Magenta
-            "FINAL ANSWER": "\033[96m",  # Cyan
-            "ARGUMENT": "\033[90m",  # Gray
-            "GENERATED RESPONSE TO SUBTASKS": "\033[96m",  # Cyan
+            "REFLECTION": "\033[94m",
+            "ACTION": "\033[92m",
+            "OBSERVATION": "\033[93m",
+            "ERROR": "\033[91m",
+            "SUBTASK": "\033[95m",
+            "FINAL ANSWER": "\033[96m",
+            "ARGUMENT": "\033[90m",
+            "GENERATED RESPONSE TO SUBTASKS": "\033[96m",
+            "SUMMARY": "\033[97m",
         }
         reset_code = "\033[0m"
         color_code = color_codes.get(action, "")
@@ -548,18 +559,53 @@ RESPONSE FORMAT
             f.write(html_content)
         print(f"Context saved to {filename}")
 
+    def summarize_large_observations(self):
+        """Summarize large observations for context management."""
+        for obs_msg, indent_level in self.large_observations:
+            summary = self.summarize_text(obs_msg)
+            summary_msg = self.format_message(summary, "SUMMARY", indent_level)
+            self.context = self.context.replace(obs_msg, summary_msg)
+        self.large_observations.clear()
+
+    def summarize_text(self, text: str) -> str:
+        """Summarize technical content."""
+        system_prompt = (
+            "You are an assistant that summarizes technical content."
+        )
+        response = self.client.chat(
+            [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": f"Please provide a concise summary of the following code using natural language:\n{text}",
+                },
+            ]
+        )
+        return response.strip()
+
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
 
     load_dotenv()
 
+    shutil.copytree("src_original/", "src/")
+
     GPT_MODEL = "gpt-4o-mini"
     OLLAMA_MODEL = "qwen2.5-coder:7b"
 
-    SELECTED_MODEL = OLLAMA_MODEL
+    SELECTED_MODEL = GPT_MODEL
 
-    task = "How did sales vary between Q1 and Q2 of 2024 in percentage and amount?"
+    task = """
+I have an implementation of the ray tracer algorithm in PyTorch.
+It is based on the book 'Ray Tracing In One Weekend', where the code is written in C++.
+
+I want you to augment my code with additional features as described in the book 'Ray Tracing The Next Week', 
+the second book of the series.
+
+I recommend you to start the task by using the observe_repository tool to get a view of the current code.
+Use the same style and structure as in the currently implemented code.
+"""
 
     if SELECTED_MODEL == GPT_MODEL:
         agent = AgentReAct(
