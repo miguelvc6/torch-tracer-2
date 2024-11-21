@@ -56,7 +56,6 @@ class UnifiedChatAPI:
 
     def log_interaction(self, messages, answer):
         """Log the interaction to the log file."""
-        data = {"messages": messages, "answer": answer}
         with open(self.log_file, "w", encoding="utf-8") as f:
             json_str = json.dumps(messages, indent=4)
             json_str_with_newlines = json_str.replace("\\n", "\n")
@@ -125,10 +124,6 @@ class DecomposedQuestion(BaseModel):
 class AgentAction(BaseModel):
     request: str
     argument: Optional[str]
-
-
-class AnswersSummary(BaseModel):
-    summary: str
 
 
 # Big Agent Class
@@ -268,7 +263,7 @@ TASK
                 if result == "end_task":
                     break
                 elif result is not None:
-                    # self.summarize_large_observations()
+                    self.summarize_large_observations()
                     pass
 
             except Exception as e:
@@ -444,7 +439,12 @@ RESPONSE FORMAT
                 if start_index == -1:
                     return "Section not found."
 
-                end_index = book.find(f"{toc[section+1]}\n==", start_index)
+                if section == max(toc.keys()):
+                    end_index = len(book)
+                else:
+                    end_index = book.find(
+                        f"{toc[section + 1]}\n==", start_index
+                    )
                 if end_index == -1:
                     end_index = len(book)
 
@@ -499,7 +499,7 @@ RESPONSE FORMAT
             with open(file_path, "r", encoding="utf-8") as f:
                 lines = f.readlines()
 
-            lines.insert(row, code)
+            lines.insert(row - 1, code)
 
             with open(file_path, "w", encoding="utf-8") as f:
                 f.writelines(lines)
@@ -516,7 +516,7 @@ RESPONSE FORMAT
             with open(file_path, "r", encoding="utf-8") as f:
                 lines = f.readlines()
 
-            lines[begin_row:end_row] = [code]
+            lines[begin_row - 1 : end_row] = [code]
 
             with open(file_path, "w", encoding="utf-8") as f:
                 f.writelines(lines)
