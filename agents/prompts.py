@@ -6,11 +6,36 @@ Write a brief reflection with the indicated response format.
 Do not call any actions or tools, return only the reflection.
 
 AVAILABLE TOOLS
-- list_sql_tables: {"Description": "Returns a list with the names of tables present in the database", "Arguments": None}
-- sql_db_schema: {"Description": "Returns the schema of a specific table in the database", "Arguments": table_name - str}
-- sql_db_query: {"Description": "Executes an SQL query in the sqlite3 database and returns the results. \
-    Do not use without first observing the table schema", "Arguments": sql_query - str}
-- math_calculator: {"Description": "Performs basic mathematical calculations", "Arguments": expression - str}
+- observe_book: {"Description": "Extracts content from a specified section of the book RayTracingTheNextWeek. \
+    The input is the section number. The following is the corresponding table of contents:
+    toc = {
+        1: "Overview",
+        2: "Motion Blur",
+        3: "Bounding Volume Hierarchies",
+        4: "Texture Mapping",
+        5: "Perlin Noise",
+        6: "Quadrilaterals",
+        7: "Lights",
+        8: "Instances",
+        9: "Volumes",
+        10: "A Scene Testing All New Features",
+    }
+    ", "Arguments": section - int}
+- run_main: {
+    "Description": "Execute the main script in src/main.py. The console output of the script is returned, \
+    may it be print statements, other outputs or error traces.", "Arguments": None}
+- observe_repository: {
+    "Description": "Get concatenated content of all Python files in src/ that build up the project", 
+    "Arguments": None}
+- insert_code: {"Description": "Insert code at specific row in a python script", "Arguments": {"file_path": str, "row": int, "code": str}}
+- modify_code: {
+    "Description": "Modify code between specific rows in a python script", 
+    "Arguments": {"file_path": str, "begin_row": int, "end_row": int, "code": str}
+    }
+- rewrite_script: {
+    "Description": "Rewrite entire file content. Attention: This will overwrite the file removing all previous content.", 
+    "Arguments": {"file_path": str, "code": str}
+    }
 
 AVAILABLE ASSISTANTS
 - decomposition: {"Description": "Divides a complex question into simpler sub-parts and calls agents \
@@ -36,11 +61,36 @@ IMPORTANT:
 - If the argument is an SQL query or a mathematical expression, include it on a single line and in double quotes.
 
 AVAILABLE TOOLS
-- list_sql_tables: {"Description": "Returns a list with the names of tables present in the database", "Arguments": null}
-- sql_db_schema: {"Description": "Returns the schema of a specific table in the database", "Arguments": "table_name" - str}
-- sql_db_query: {"Description: "Executes an SQL query in the sqlite3 database and returns the results. \
-    Do not use without first observing the table schema", Arguments: sql_query - str}
-- math_calculator: {"Description": "Performs basic mathematical calculations", "Arguments": "expression" - str}
+- observe_book: {"Description": "Extracts content from a specified section of the book RayTracingTheNextWeek. \
+    The input is the section number. The following is the corresponding table of contents:
+    toc = {
+        1: "Overview",
+        2: "Motion Blur",
+        3: "Bounding Volume Hierarchies",
+        4: "Texture Mapping",
+        5: "Perlin Noise",
+        6: "Quadrilaterals",
+        7: "Lights",
+        8: "Instances",
+        9: "Volumes",
+        10: "A Scene Testing All New Features",
+    }
+    ", "Arguments": section - int}
+- run_main: {
+    "Description": "Execute the main script in src/main.py. The console output of the script is returned, \
+    may it be print statements, other outputs or error traces.", "Arguments": None}
+- observe_repository: {
+    "Description": "Get concatenated content of all Python files in src/ that build up the project", 
+    "Arguments": None}
+- insert_code: {"Description": "Insert code at specific row in a python script", "Arguments": {"file_path": str, "row": int, "code": str}}
+- modify_code: {
+    "Description": "Modify code between specific rows in a python script", 
+    "Arguments": {"file_path": str, "begin_row": int, "end_row": int, "code": str}
+    }
+- rewrite_script: {
+    "Description": "Rewrite entire file content. Attention: This will overwrite the file removing all previous content.", 
+    "Arguments": {"file_path": str, "code": str}
+    }
 """
 
 ACTION_SYSTEM_PROMPT_DECOMPOSITION = """
@@ -61,27 +111,51 @@ RESPONSE FORMAT
 
 EXAMPLES:
 
-1. Using a tool without an argument:
+1. Using observe_book with a section number:
 {
-  "request": "list_sql_tables",
+  "request": "observe_book",
+  "argument": "1"
+}
+
+2. Using run_main without arguments:
+{
+  "request": "run_main",
   "argument": null
 }
 
-2. Using a tool with an argument:
+3. Using modify_code with file path and row numbers:
 {
-  "request": "sql_db_schema",
-  "argument": "ORDERS"
+  "request": "modify_code",
+  "argument": "{\"file_path\": \"src/main.py\", \"begin_row\": 10, \"end_row\": 15, \"code\": \"def new_function():\\n    return True\\n\"}"
 }
 
-3. Using sql_db_query with an SQL query:
+4. Using observe_repository without arguments:
 {
-  "request": "sql_db_query",
-  "argument": "SELECT * FROM ORDERS WHERE date(ORD_DATE) BETWEEN date('2024-01-01') AND date('2024-06-30');"
+  "request": "observe_repository",
+  "argument": null
 }
 
-4. Final answer:
+5. Using insert_code to add new code:
+{
+  "request": "insert_code",
+  "argument": "{\"file_path\": \"src/camera.py\", \"row\": 25, \"code\": \"    def get_focal_length(self):\\n        return self._focal_length\\n\"}"
+}
+
+6. Using rewrite_script to replace entire file:
+{
+  "request": "rewrite_script",
+  "argument": "{\"file_path\": \"src/utils.py\", \"code\": \"def calculate_vector(x, y, z):\\n    return Vector3(x, y, z)\\n\"}"
+}
+
+7. Using decomposition for complex questions:
+{
+  "request": "decomposition",
+  "argument": "How does the ray tracer handle both motion blur and texture mapping?"
+}
+
+8. Final answer:
 {
   "request": "final_answer",
-  "argument": "There were a total of 305 orders in 2024."
+  "argument": "Based on the repository content, the ray tracer implements motion blur in section 2."
 }
 """
