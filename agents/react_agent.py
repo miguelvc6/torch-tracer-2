@@ -282,6 +282,8 @@ TASK
                 result = self.run_main()
             elif action.request == "observe_repository":
                 result = self.observe_repository()
+            elif action.request == "observe_single_script":
+                result = self.observe_single_script(action.argument)
             elif action.request == "insert_code":
                 args = json.loads(action.argument)
                 result = self.insert_code(
@@ -485,6 +487,15 @@ RESPONSE FORMAT
             return "Script rewritten successfully"
         except Exception as e:
             print(f"Error rewriting script: {e}")
+            return None
+
+    def observe_single_script(self, script_name: str) -> Optional[str]:
+        """Get content of a specific script."""
+        try:
+            with open(f"src/{script_name}", "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception as e:
+            print(f"Error observing script: {e}")
             return None
 
     # Final Answer Tool

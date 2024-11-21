@@ -21,6 +21,7 @@ AVAILABLE TOOLS
         10: "A Scene Testing All New Features",
     }
     ", "Arguments": section - int}
+- observe_single_script: {"Description": "Get content of a specific script from the repository", "Arguments": script_name - str}
 - run_main: {
     "Description": "Execute the main script in src/main.py. The console output of the script is returned, \
     may it be print statements, other outputs or error traces.", "Arguments": None}
@@ -76,6 +77,7 @@ AVAILABLE TOOLS
         10: "A Scene Testing All New Features",
     }
     ", "Arguments": section - int}
+- observe_single_script: {"Description": "Get content of a specific script from the repository", "Arguments": script_name - str}
 - run_main: {
     "Description": "Execute the main script in src/main.py. The console output of the script is returned, \
     may it be print statements, other outputs or error traces.", "Arguments": None}
@@ -153,9 +155,17 @@ EXAMPLES:
   "argument": "How does the ray tracer handle both motion blur and texture mapping?"
 }
 
-8. Final answer:
+8. Using observe_single_script to read a specific script:
+{
+  "request": "observe_single_script",
+  "argument": "camera.py"
+}
+
+9. Final answer:
 {
   "request": "final_answer",
   "argument": "Based on the repository content, the ray tracer implements motion blur in section 2."
 }
+
+
 """
