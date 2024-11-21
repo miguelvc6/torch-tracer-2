@@ -1,20 +1,21 @@
 import json
 import os
 import sqlite3
+import subprocess
+import sys
 import textwrap
 from typing import List, Optional
 
-import openai
 import ollama
+import openai
 from ansi2html import Ansi2HTMLConverter
-from pydantic import BaseModel, ValidationError
-
 from prompts import (
     ACTION_SYSTEM_PROMPT_01,
     ACTION_SYSTEM_PROMPT_02,
     ACTION_SYSTEM_PROMPT_DECOMPOSITION,
     REFLECTION_SYSTEM_PROMPT,
 )
+from pydantic import BaseModel, ValidationError
 
 
 # Unified Chat API
@@ -306,39 +307,50 @@ QUESTION
         """Execute the chosen action and handle the result."""
         try:
             result = None
-            # Execute the chosen action
-            if action.request == "list_sql_tables":
-                result = self.list_sql_tables()
-            elif action.request == "sql_db_schema":
-                result = self.sql_db_schema(action.argument)
-            elif action.request == "sql_db_query":
-                result = self.sql_db_query(action.argument)
-            elif action.request == "math_calculator":
-                result = self.math_calculator(action.argument)
+            if action.request == "observe_book":
+                result = self.observe_book(int(action.argument))
+            elif action.request == "run_main":
+                result = self.run_main()
+            elif action.request == "observe_repository":
+                result = self.observe_repository()
+            elif action.request == "insert_code":
+                args = json.loads(action.argument)
+                result = self.insert_code(
+                    args["file_path"], args["row"], args["code"]
+                )
+            elif action.request == "modify_code":
+                args = json.loads(action.argument)
+                result = self.modify_code(
+                    args["file_path"],
+                    args["begin_row"],
+                    args["end_row"],
+                    args["code"],
+                )
+            elif action.request == "rewrite_script":
+                args = json.loads(action.argument)
+                result = self.rewrite_script(args["file_path"], args["code"])
             elif action.request == "decomposition":
                 self.handle_decomposition(action, indent_level)
-                return None  # Continue the loop
+                return None
             elif action.request == "final_answer":
                 self.handle_final_answer(question, action, indent_level)
-                return action.argument  # Return the final answer
+                return action.argument
             else:
                 raise ValueError(f"Unknown action request: {action.request}")
 
-            # Append observation to context
             if result is not None:
                 obs_msg = self.format_message(
                     str(result), "OBSERVATION", indent_level
                 )
                 self.context += obs_msg
         except Exception as e:
-            # Append error observation to context
             error_msg = self.format_message(
                 f"Error executing {action.request}: {str(e)}",
                 "ERROR",
                 indent_level,
             )
             self.context += error_msg
-        return None  # Continue the loop
+        return None
 
     def handle_decomposition(self, action: AgentAction, indent_level: int):
         """Handle the decomposition action."""
@@ -442,46 +454,118 @@ RESPONSE FORMAT
         )
 
     # Tools
-    def math_calculator(self, expression: str) -> Optional[float]:
-        """Evaluate a mathematical expression."""
+    def observe_book(self, section: int) -> Optional[str]:
+        """Extracts content from a specified section of the book."""
         try:
-            result = eval(expression)
-            return result
+            toc = {
+                1: "Overview",
+                2: "Motion Blur",
+                3: "Bounding Volume Hierarchies",
+                4: "Texture Mapping",
+                5: "Perlin Noise",
+                6: "Quadrilaterals",
+                7: "Lights",
+                8: "Instances",
+                9: "Volumes",
+                10: "A Scene Testing All New Features",
+            }
+
+            with open("RayTracingTheNextWeek.html", encoding="utf-8") as f:
+                book = f.read()
+                search_term = f"{toc[section]}\n=="
+                start_index = book.find(search_term)
+                if start_index == -1:
+                    return "Section not found."
+
+                end_index = book.find(f"{toc[section+1]}\n==", start_index)
+                if end_index == -1:
+                    end_index = len(book)
+
+                return book[start_index:end_index]
         except Exception as e:
-            print(f"Error evaluating expression: {e}")
+            print(f"Error observing book section: {e}")
             return None
 
-    def list_sql_tables(self) -> Optional[List[str]]:
-        """List all tables in the SQL database."""
+    def run_main(self) -> Optional[str]:
+        """Execute the main script."""
         try:
-            self.cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table';"
+            result = subprocess.run(
+                [sys.executable, "src/main.py"],
+                capture_output=True,
+                text=True,
+                check=True,
             )
-            result = self.cursor.fetchall()
-            return [table[0] for table in result]
-        except Exception as e:
-            print(f"Error listing tables: {e}")
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            print(f"Error running main: {e.stderr}")
             return None
 
-    def sql_db_schema(self, table_name: str) -> Optional[str]:
-        """Return schema of a specific table in the database."""
+    def observe_repository(self) -> Optional[str]:
+        """Get concatenated content of all Python files in src/."""
         try:
-            self.cursor.execute(f"PRAGMA table_info({table_name});")
-            result = self.cursor.fetchall()
-            schema = "\n".join([f"{row[1]} {row[2]}" for row in result])
-            return schema
+            src_path = "src/"
+            concatenated_content = ""
+
+            for root, _, files in os.walk(src_path):
+                for file in files:
+                    if file.endswith(".py"):
+                        file_path = os.path.join(root, file)
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            concatenated_content += (
+                                f"### {file_path}\n# "
+                                + "=" * 98
+                                + "\n"
+                                + f.read()
+                                + "\n\n"
+                            )
+
+            return concatenated_content
         except Exception as e:
-            print(f"Error retrieving schema for table {table_name}: {e}")
+            print(f"Error observing repository: {e}")
             return None
 
-    def sql_db_query(self, query: str) -> Optional[str]:
-        """Run an SQL query and return the result."""
+    def insert_code(
+        self, file_path: str, row: int, code: str
+    ) -> Optional[str]:
+        """Insert code at specific row."""
         try:
-            self.cursor.execute(query)
-            result = self.cursor.fetchall()
-            return str(result)
+            with open(file_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            lines.insert(row, code)
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.writelines(lines)
+            return "Code inserted successfully"
         except Exception as e:
-            print(f"Error executing query: {e}")
+            print(f"Error inserting code: {e}")
+            return None
+
+    def modify_code(
+        self, file_path: str, begin_row: int, end_row: int, code: str
+    ) -> Optional[str]:
+        """Modify code between specific rows."""
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            lines[begin_row:end_row] = [code]
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.writelines(lines)
+            return "Code modified successfully"
+        except Exception as e:
+            print(f"Error modifying code: {e}")
+            return None
+
+    def rewrite_script(self, file_path: str, code: str) -> Optional[str]:
+        """Rewrite entire file content."""
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(code)
+            return "Script rewritten successfully"
+        except Exception as e:
+            print(f"Error rewriting script: {e}")
             return None
 
     # Final Answer Tool
