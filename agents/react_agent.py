@@ -1,6 +1,5 @@
 import json
 import os
-import sqlite3
 import subprocess
 import sys
 import textwrap
@@ -66,33 +65,33 @@ class UnifiedChatAPI:
 
 
 class SimpleMemory:
-    """Simple in-memory storage for question and answer traces."""
+    """Simple in-memory storage for task and answer traces."""
 
     def __init__(self):
-        self.question_trace = []
+        self.task_trace = []
         self.answer_trace = []
 
-    def add_interaction(self, question, answer):
-        self.question_trace.append(question)
+    def add_interaction(self, task, answer):
+        self.task_trace.append(task)
         self.answer_trace.append(answer)
 
     def get_context(self):
-        if not self.question_trace:
+        if not self.task_trace:
             return ""
         else:
             context_lines = [
-                "Here are the questions and answers from the previous interactions.",
-                "Use them to answer the current question if they are relevant:",
+                "Here are the tasks and answers from the previous interactions.",
+                "Use them to answer the current task if they are relevant:",
             ]
-            for q, a in zip(self.question_trace, self.answer_trace):
-                context_lines.append(f"QUESTION: {q}")
+            for q, a in zip(self.task_trace, self.answer_trace):
+                context_lines.append(f"TASK: {q}")
                 context_lines.append(f"ANSWER: {a}")
             return "\n".join(context_lines)
 
 
 # Pydantic Models for output validation
 class DecomposedQuestion(BaseModel):
-    sub_questions: List[str]
+    sub_tasks: List[str]
 
 
 class AgentAction(BaseModel):
@@ -111,7 +110,6 @@ class AgentReAct:
     def __init__(
         self,
         model="gpt-4o-mini",
-        db_path="./sql_lite_database.db",
         memory_path="agent_memory.json",
     ):
         """Initialize Agent with database path and model."""
@@ -119,36 +117,7 @@ class AgentReAct:
         self.client = UnifiedChatAPI(model=self.model)
         self.memory = self.load_memory()
         self.context = ""
-        self.db_path = db_path
-        self.conn = None
-        self.cursor = None
-        self._connect_db()
         self.memory_path = memory_path
-
-    # Database Management
-    def _connect_db(self):
-        """Connect to the SQLite database."""
-        if not os.path.exists(self.db_path):
-            raise RuntimeError(f"Database file not found at: {self.db_path}")
-        try:
-            self.conn = sqlite3.connect(self.db_path)
-            self.cursor = self.conn.cursor()
-        except sqlite3.Error as e:
-            self._close_db()
-            raise RuntimeError(f"Database connection failed: {e}")
-
-    def _close_db(self):
-        """Close the database connection."""
-        if self.cursor:
-            self.cursor.close()
-        if self.conn:
-            self.conn.close()
-        self.cursor = None
-        self.conn = None
-
-    def __del__(self):
-        """Destructor to ensure the database connection is closed."""
-        self._close_db()
 
     # Memory Management
     def load_memory(self):
@@ -164,7 +133,7 @@ class AgentReAct:
         with open(self.memory_path, "w", encoding="utf-8") as f:
             json.dump(
                 {
-                    "question_trace": self.memory.question_trace,
+                    "task_trace": self.memory.task_trace,
                     "answer_trace": self.memory.answer_trace,
                 },
                 f,
@@ -172,14 +141,14 @@ class AgentReAct:
             )
 
     # Agent Reflections
-    def reflection(self, question: str) -> str:
+    def reflection(self, task: str) -> str:
         """Perform an agent reflection."""
-        context = self.context or "<No previous questions have been asked>"
+        context = self.context or "<No previous tasks have been asked>"
         agent_template = f"""CONTEXTUAL INFORMATION
 {context}
 
-QUESTION
-{question}"""
+TASK
+{task}"""
 
         assistant_reply = self.client.chat(
             [
@@ -191,7 +160,7 @@ QUESTION
 
     # Agent Actions
     def action(
-        self, question: str, recursion=False, max_retrials: int = 3
+        self, task: str, recursion=False, max_retrials: int = 3
     ) -> AgentAction:
         """Determine the next action for the agent."""
         action_system_prompt = (
@@ -200,12 +169,12 @@ QUESTION
             + ACTION_SYSTEM_PROMPT_02
         )
 
-        context = self.context or "<No previous questions have been asked>"
+        context = self.context or "<No previous tasks have been asked>"
         agent_template = f"""CONTEXTUAL INFORMATION
 {context}
 
-QUESTION
-{question}"""
+TASK
+{task}"""
 
         for attempt in range(max_retrials):
             assistant_reply = self.client.chat(
@@ -245,19 +214,19 @@ QUESTION
         )
 
     def run_agent(
-        self, question: str, recursion: bool = False, indent_level: int = 0
+        self, task: str, recursion: bool = False, indent_level: int = 0
     ) -> str:
-        """Run the ReAct agent to answer a question."""
+        """Run the ReAct agent to solve a task."""
         if not recursion:
             self.context = self.memory.get_context()
             print("\n")
 
         while True:
             try:
-                self.perform_reflection(question, indent_level)
-                action = self.decide_action(question, recursion, indent_level)
+                self.perform_reflection(task, indent_level)
+                action = self.decide_action(task, recursion, indent_level)
                 result = self.execute_action(
-                    action, question, recursion, indent_level
+                    action, task, recursion, indent_level
                 )
 
                 if result is not None:
@@ -269,9 +238,9 @@ QUESTION
                 break
 
     # Helper Methods
-    def perform_reflection(self, question: str, indent_level: int):
+    def perform_reflection(self, task: str, indent_level: int):
         """Perform reflection and update context."""
-        reflection = self.reflection(question=question)
+        reflection = self.reflection(task=task)
         reflection_msg = self.format_message(
             reflection.split(">> ")[1], "REFLECTION", indent_level
         )
@@ -279,14 +248,14 @@ QUESTION
 
     def decide_action(
         self,
-        question: str,
+        task: str,
         recursion: bool,
         indent_level: int,
         max_retrials: int = 3,
     ) -> AgentAction:
         """Decide on the next action and update context."""
         action = self.action(
-            question=question, recursion=recursion, max_retrials=max_retrials
+            task=task, recursion=recursion, max_retrials=max_retrials
         )
         action_msg = self.format_message(
             action.request, "ACTION", indent_level
@@ -302,7 +271,7 @@ QUESTION
         return action
 
     def execute_action(
-        self, action: AgentAction, question: str, indent_level: int
+        self, action: AgentAction, task: str, indent_level: int
     ) -> Optional[str]:
         """Execute the chosen action and handle the result."""
         try:
@@ -333,7 +302,7 @@ QUESTION
                 self.handle_decomposition(action, indent_level)
                 return None
             elif action.request == "final_answer":
-                self.handle_final_answer(question, action, indent_level)
+                self.handle_final_answer(task, action, indent_level)
                 return action.argument
             else:
                 raise ValueError(f"Unknown action request: {action.request}")
@@ -354,95 +323,45 @@ QUESTION
 
     def handle_decomposition(self, action: AgentAction, indent_level: int):
         """Handle the decomposition action."""
-        result = self.decompose_question(question=action.argument)
+        result = self.decompose_task(task=action.argument)
         obs_msg = self.format_message(str(result), "OBSERVATION", indent_level)
         self.context += obs_msg
 
-        # Answer subquestions recursively
+        # Answer subtasks recursively
         answers = []
-        for subquestion in result.sub_questions:
-            subq_msg = self.format_message(
-                subquestion, "SUBQUESTION", indent_level
-            )
+        for subtask in result.sub_tasks:
+            subq_msg = self.format_message(subtask, "SUBTASK", indent_level)
             self.context += subq_msg
             # Run agent recursively
             answer = self.run_agent(
-                subquestion,
+                subtask,
                 recursion=True,
                 indent_level=min(indent_level + 1, 3),
             )
             answers.append(answer)
 
-        # Summarize answers
-        summary = self.answers_summarizer(result.sub_questions, answers)
-        summary_msg = self.format_message(
-            summary.summary, "GENERATED RESPONSE TO SUBQUESTIONS", indent_level
-        )
-        self.context += summary_msg
-
     # Assistants
-    def decompose_question(
-        self, question: str, max_retrials: int = 3
+    def decompose_task(
+        self, task: str, max_retrials: int = 3
     ) -> DecomposedQuestion:
-        """Decompose a complex question into simpler parts."""
+        """Decompose a complex task into simpler parts."""
         decomp_system_prompt = """GENERAL INSTRUCTIONS
-You are an expert in the domain of the following question. Your task is to decompose a complex question into simpler parts.
+You are an expert in the domain of the following task. Your task is to decompose a complex task into simpler parts.
 
 RESPONSE FORMAT
-{"sub_questions":["<FILL>"]}"""
+{"sub_tasks":["<FILL>"]}"""
 
         for attempt in range(max_retrials):
             assistant_reply = self.client.chat(
                 [
                     {"role": "system", "content": decomp_system_prompt},
-                    {"role": "user", "content": question},
+                    {"role": "user", "content": task},
                 ]
             )
 
             try:
                 response_content = json.loads(assistant_reply)
                 validated_response = DecomposedQuestion.model_validate(
-                    response_content
-                )
-                return validated_response
-            except (json.JSONDecodeError, ValidationError) as e:
-                print(f"Validation error on attempt {attempt + 1}: {e}")
-
-        raise RuntimeError(
-            "Maximum number of retries reached without successful validation."
-        )
-
-    def answers_summarizer(
-        self, questions: List[str], answers: List[str], max_retrials: int = 3
-    ) -> AnswersSummary:
-        """Summarize a list of answers to the decomposed questions."""
-        answer_summarizer_system_prompt = """GENERAL INSTRUCTIONS
-You are an expert in the domain of the following questions. Your task is to summarize the answers to the questions into a single response.
-
-RESPONSE FORMAT
-{"summary": "<FILL>"}"""
-
-        q_and_a_prompt = "\n\n".join(
-            [
-                f"SUBQUESTION {i+1}\n{q}\nANSWER {i+1}\n{a}"
-                for i, (q, a) in enumerate(zip(questions, answers))
-            ]
-        )
-
-        for attempt in range(max_retrials):
-            assistant_reply = self.client.chat(
-                [
-                    {
-                        "role": "system",
-                        "content": answer_summarizer_system_prompt,
-                    },
-                    {"role": "user", "content": q_and_a_prompt},
-                ]
-            )
-
-            try:
-                response_content = json.loads(assistant_reply)
-                validated_response = AnswersSummary.model_validate(
                     response_content
                 )
                 return validated_response
@@ -570,11 +489,11 @@ RESPONSE FORMAT
 
     # Final Answer Tool
     def handle_final_answer(
-        self, question: str, action: AgentAction, indent_level: int
+        self, task: str, action: AgentAction, indent_level: int
     ):
         """Handle the final answer action."""
         # Update memory
-        self.memory.add_interaction(question, action.argument)
+        self.memory.add_interaction(task, action.argument)
         final_answer_msg = self.format_message(
             action.argument, "FINAL ANSWER", indent_level
         )
@@ -600,10 +519,10 @@ RESPONSE FORMAT
             "ACTION": "\033[92m",  # Green
             "OBSERVATION": "\033[93m",  # Yellow
             "ERROR": "\033[91m",  # Red
-            "SUBQUESTION": "\033[95m",  # Magenta
+            "SUBTASK": "\033[95m",  # Magenta
             "FINAL ANSWER": "\033[96m",  # Cyan
             "ARGUMENT": "\033[90m",  # Gray
-            "GENERATED RESPONSE TO SUBQUESTIONS": "\033[96m",  # Cyan
+            "GENERATED RESPONSE TO SUBTASKS": "\033[96m",  # Cyan
         }
         reset_code = "\033[0m"
         color_code = color_codes.get(action, "")
@@ -629,23 +548,22 @@ if __name__ == "__main__":
 
     SELECTED_MODEL = OLLAMA_MODEL
 
+    task = "How did sales vary between Q1 and Q2 of 2024 in percentage and amount?"
+
     if SELECTED_MODEL == GPT_MODEL:
         agent = AgentReAct(
             model=SELECTED_MODEL,
-            db_path="sql_lite_database.db",
             memory_path="agent_memory_gpt.json",
         )
-        question = "How did sales vary between Q1 and Q2 of 2024 in percentage and amount?"
-        agent.run_agent(question)
+        agent.run_agent(task)
         agent.save_context_to_html("agent_context_gpt.html")
         agent.save_memory()
 
     elif SELECTED_MODEL == OLLAMA_MODEL:
         agent = AgentReAct(
             model=SELECTED_MODEL,
-            db_path="sql_lite_database.db",
             memory_path="agent_memory_ollama.json",
         )
-        simpler_question = "How many orders were there in 2024?"
-        agent.run_agent(simpler_question)
+        agent.run_agent(task)
         agent.save_context_to_html("agent_context_ollama.html")
+        agent.save_memory()
