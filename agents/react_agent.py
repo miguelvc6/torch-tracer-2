@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -10,8 +11,11 @@ from typing import List, Optional
 import ollama
 import openai
 from ansi2html import Ansi2HTMLConverter
-
 from pydantic import BaseModel, ValidationError
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 # System prompts for the language model
 REFLECTION_SYSTEM_PROMPT = """GENERAL INSTRUCTIONS
@@ -496,7 +500,9 @@ TASK
 
     # Tools
     def observe_book(self, section: int) -> Optional[str]:
-        """Extracts content from a specified section of the book."""
+        """
+        Extracts content from a specified section of the book.
+        """
         try:
             toc = {
                 1: "Overview",
@@ -511,125 +517,260 @@ TASK
                 10: "A Scene Testing All New Features",
             }
 
+            if section not in toc:
+                raise ValueError(
+                    f"Invalid section number. Must be between 1 and {len(toc)}"
+                )
+
             with open("RayTracingTheNextWeek.html", encoding="utf-8") as f:
                 book = f.read()
                 search_term = f"{toc[section]}\n=="
                 start_index = book.find(search_term)
+
                 if start_index == -1:
-                    return "Section not found."
+                    return f"Section '{toc[section]}' not found in book."
 
+                # For last section, read until end of file
                 if section == max(toc.keys()):
-                    end_index = len(book)
-                else:
-                    end_index = book.find(
-                        f"{toc[section + 1]}\n==", start_index
-                    )
-                if end_index == -1:
-                    end_index = len(book)
+                    return book[start_index:]
 
-                return book[start_index:end_index]
+                # Otherwise find start of next section
+                next_section = f"{toc[section + 1]}\n=="
+                end_index = book.find(next_section, start_index)
+
+                return (
+                    book[start_index:end_index]
+                    if end_index != -1
+                    else book[start_index:]
+                )
+
         except Exception as e:
-            print(f"Error observing book section: {e}")
+            logging.error(f"Error observing book section {section}: {str(e)}")
             return None
 
     def run_main(self) -> Optional[str]:
-        """Execute the main script."""
+        """
+        Execute the main script and capture its output.
+        """
         try:
-            result = subprocess.run(
+            # Use context manager for better resource handling
+            process = subprocess.run(
                 [sys.executable, "src/main.py"],
                 capture_output=True,
                 text=True,
                 check=True,
+                env={
+                    **os.environ,
+                    "PYTHONUNBUFFERED": "1",
+                },  # Ensure unbuffered output
             )
-            return result.stdout
+            return process.stdout
         except subprocess.CalledProcessError as e:
-            print(f"Error running main: {e.stderr}")
+            logging.error(f"Error running main script: {e.stderr}")
+            return f"Error: {e.stderr}"
+        except Exception as e:
+            logging.error(f"Unexpected error running main script: {str(e)}")
             return None
 
     def observe_repository(self) -> Optional[str]:
-        """Get concatenated content of all Python files in src/."""
+        """
+        Get concatenated content of all Python files in src/ directory.
+        """
         try:
             src_path = "src/"
-            concatenated_content = ""
+            if not os.path.exists(src_path):
+                raise FileNotFoundError(
+                    f"Source directory '{src_path}' not found"
+                )
+
+            concatenated_content = []
 
             for root, _, files in os.walk(src_path):
-                for file in files:
+                # Sort files for consistent ordering
+                for file in sorted(files):
                     if file.endswith(".py"):
                         file_path = os.path.join(root, file)
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            concatenated_content += (
-                                f"### {file_path}\n# "
-                                + "=" * 98
-                                + "\n"
-                                + f.read()
-                                + "\n\n"
+                        rel_path = os.path.relpath(file_path, src_path)
+
+                        try:
+                            with open(file_path, "r", encoding="utf-8") as f:
+                                content = f.read()
+                                separator = "=" * 100
+                                concatenated_content.append(
+                                    f"### {rel_path}\n{separator}\n{content}\n\n"
+                                )
+                        except Exception as e:
+                            logging.error(
+                                f"Error reading {file_path}: {str(e)}"
+                            )
+                            concatenated_content.append(
+                                f"### {rel_path}\nError reading file: {str(e)}\n\n"
                             )
 
-            return concatenated_content
+            return (
+                "".join(concatenated_content)
+                if concatenated_content
+                else "No Python files found"
+            )
+
         except Exception as e:
-            print(f"Error observing repository: {e}")
+            logging.error(f"Error observing repository: {str(e)}")
             return None
 
     def insert_code(
         self, file_path: str, row: int, code: str
     ) -> Optional[str]:
-        """Insert code at specific row."""
+        """
+        Insert code at specific row in a Python file.
+        """
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"File '{file_path}' not found")
 
-            lines.insert(row - 1, code)
+            if row < 1:
+                raise ValueError("Row number must be positive")
 
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.writelines(lines)
-            return "Code inserted successfully"
+            # Create backup
+            backup_path = f"{file_path}.bak"
+            shutil.copy2(file_path, backup_path)
+
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+
+                if row > len(lines) + 1:
+                    raise ValueError(
+                        f"Row {row} exceeds file length ({len(lines)} lines)"
+                    )
+
+                # Ensure code ends with newline
+                if not code.endswith("\n"):
+                    code += "\n"
+
+                lines.insert(row - 1, code)
+
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.writelines(lines)
+
+                os.remove(backup_path)
+                return f"Code inserted successfully at row {row}"
+
+            except Exception as e:
+                # Restore backup on error
+                shutil.move(backup_path, file_path)
+                raise e
+
         except Exception as e:
-            print(f"Error inserting code: {e}")
+            logging.error(f"Error inserting code: {str(e)}")
             return None
 
     def modify_code(
         self, file_path: str, begin_row: int, end_row: int, code: str
     ) -> Optional[str]:
-        """Modify code between specific rows."""
+        """
+        Modify code between specific rows in a Python file.
+        """
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"File '{file_path}' not found")
 
-            lines[begin_row - 1 : end_row] = [code]
+            if begin_row < 1:
+                raise ValueError("Beginning row must be positive")
+            if end_row < begin_row:
+                raise ValueError(
+                    "End row must be greater than or equal to begin row"
+                )
 
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.writelines(lines)
-            return "Code modified successfully"
+            # Create backup
+            backup_path = f"{file_path}.bak"
+            shutil.copy2(file_path, backup_path)
+
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+
+                if begin_row > len(lines):
+                    raise ValueError(
+                        f"Begin row {begin_row} exceeds file length ({len(lines)} lines)"
+                    )
+                if end_row > len(lines):
+                    raise ValueError(
+                        f"End row {end_row} exceeds file length ({len(lines)} lines)"
+                    )
+
+                # Ensure code ends with newline
+                if not code.endswith("\n"):
+                    code += "\n"
+
+                lines[begin_row - 1 : end_row] = [code]
+
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.writelines(lines)
+
+                os.remove(backup_path)
+                return f"Code modified successfully between rows {begin_row} and {end_row}"
+
+            except Exception as e:
+                # Restore backup on error
+                shutil.move(backup_path, file_path)
+                raise e
+
         except Exception as e:
-            print(f"Error modifying code: {e}")
+            logging.error(f"Error modifying code: {str(e)}")
             return None
 
     def rewrite_script(self, file_path: str, code: str) -> Optional[str]:
-        """Rewrite entire file content."""
+        """
+        Rewrite entire content of a Python file.
+        """
         try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(code)
-            return "Script rewritten successfully"
+            # Create parent directory if it doesn't exist
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+            # Create backup if file exists
+            if os.path.exists(file_path):
+                backup_path = f"{file_path}.bak"
+                shutil.copy2(file_path, backup_path)
+
+            try:
+                # Ensure code ends with newline
+                if not code.endswith("\n"):
+                    code += "\n"
+
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(code)
+
+                if os.path.exists(f"{file_path}.bak"):
+                    os.remove(f"{file_path}.bak")
+                return f"Script {file_path} rewritten successfully"
+
+            except Exception as e:
+                # Restore backup if it exists
+                if os.path.exists(f"{file_path}.bak"):
+                    shutil.move(f"{file_path}.bak", file_path)
+                raise e
+
         except Exception as e:
-            print(f"Error rewriting script: {e}")
+            logging.error(f"Error rewriting script: {str(e)}")
             return None
 
     def observe_single_script(self, script_name: str) -> Optional[str]:
-        """Get content of a specific script."""
+        """
+        Get content of a specific Python script from src/ directory.
+        """
         try:
-            with open(f"src/{script_name}", "r", encoding="utf-8") as f:
-                return f.read()
-        except Exception as e:
-            print(f"Error observing script: {e}")
-            return None
+            file_path = f"src/{script_name}"
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(
+                    f"Script '{script_name}' not found in src/ directory"
+                )
 
-    # Final Answer Tool
-    def handle_end_task(self) -> str:
-        """Handle the end task action."""
-        end_task_msg = self.format_message("Task completed.", "END OF TASK")
-        self.context += end_task_msg
-        os.system("cls" if os.name == "nt" else "clear")
-        print(self.context)
+            with open(file_path, "r", encoding="utf-8") as f:
+                return f.read()
+
+        except Exception as e:
+            logging.error(f"Error observing script {script_name}: {str(e)}")
+            return None
 
     # Formatting
     def format_message(self, text: str, action: str) -> str:
@@ -695,7 +836,7 @@ if __name__ == "__main__":
         shutil.rmtree("src/")
     shutil.copytree("src_original/", "src/")
 
-    GPT_MODEL = "gpt-4o-mini"  # gpt-4o-2024-11-20
+    GPT_MODEL = "gpt-4o-2024-11-20"
     OLLAMA_MODEL = "qwen2.5-coder:7b"
 
     SELECTED_MODEL = GPT_MODEL
