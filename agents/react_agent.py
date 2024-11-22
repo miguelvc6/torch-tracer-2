@@ -617,98 +617,194 @@ TASK
             logging.error(f"Error observing repository: {str(e)}")
             return None
 
-    def insert_code(
-        self, file_path: str, row: int, code: str
+    def edit_code(
+        self, file_path: str, original_block: str, new_block: str
     ) -> Optional[str]:
         """
-        Insert code at specific row in a Python file.
+        Edit code by replacing a specific code block with a new one using a diff-like approach.
+        The tool identifies the exact block to replace, ensuring precision in modifications.
+
+        Args:
+            file_path (str): Path to the target file
+            original_block (str): The exact code block to be replaced (must match exactly)
+            new_block (str): The new code block to insert
+
+        Returns:
+            Optional[str]: Success message, error message, or None if operation fails
         """
         try:
             if not os.path.exists(file_path):
                 raise FileNotFoundError(f"File '{file_path}' not found")
-
-            if row < 1:
-                raise ValueError("Row number must be positive")
 
             # Create backup
             backup_path = f"{file_path}.bak"
             shutil.copy2(file_path, backup_path)
 
             try:
+                # Read file content
                 with open(file_path, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
+                    content = f.read()
 
-                if row > len(lines) + 1:
-                    raise ValueError(
-                        f"Row {row} exceeds file length ({len(lines)} lines)"
+                # Normalize line endings and whitespace in both blocks
+                original_block = original_block.strip().replace("\r\n", "\n")
+                new_block = new_block.strip().replace("\r\n", "\n")
+
+                # Attempt to find the original block
+                if original_block not in content:
+                    # Try with normalized indentation
+                    normalized_original = "\n".join(
+                        line.strip() for line in original_block.split("\n")
+                    )
+                    normalized_content = "\n".join(
+                        line.strip() for line in content.split("\n")
                     )
 
-                # Ensure code ends with newline
-                if not code.endswith("\n"):
-                    code += "\n"
+                    if normalized_original not in normalized_content:
+                        raise ValueError(
+                            "Original code block not found in file. "
+                            "Please ensure the original block matches exactly."
+                        )
+                    else:
+                        # Find the indentation of the original block
+                        start_idx = content.find(
+                            original_block.split("\n")[0].lstrip()
+                        )
+                        leading_whitespace = content[
+                            start_idx
+                            - content[start_idx::-1].find("\n") : start_idx
+                        ]
 
-                lines.insert(row - 1, code)
+                        # Apply original indentation to new block
+                        new_block = "\n".join(
+                            leading_whitespace + line if line.strip() else line
+                            for line in new_block.split("\n")
+                        )
 
+                # Perform the replacement
+                new_content = content.replace(original_block, new_block)
+
+                # Ensure file ends with a newline
+                if not new_content.endswith("\n"):
+                    new_content += "\n"
+
+                # Write the modified content
                 with open(file_path, "w", encoding="utf-8") as f:
-                    f.writelines(lines)
+                    f.write(new_content)
 
+                # Remove backup if successful
                 os.remove(backup_path)
-                return f"Code inserted successfully at row {row}"
 
-            except Exception as e:
-                # Restore backup on error
-                shutil.move(backup_path, file_path)
-                raise e
-
-        except Exception as e:
-            logging.error(f"Error inserting code: {str(e)}")
-            return None
-
-    def modify_code(
-        self, file_path: str, begin_row: int, end_row: int, code: str
-    ) -> Optional[str]:
-        """
-        Modify code between specific rows in a Python file.
-        """
-        try:
-            if not os.path.exists(file_path):
-                raise FileNotFoundError(f"File '{file_path}' not found")
-
-            if begin_row < 1:
-                raise ValueError("Beginning row must be positive")
-            if end_row < begin_row:
-                raise ValueError(
-                    "End row must be greater than or equal to begin row"
+                return (
+                    f"Code block successfully replaced in {file_path}\n"
+                    f"Original block:\n{original_block}\n"
+                    f"New block:\n{new_block}"
                 )
 
+            except Exception as e:
+                # Restore backup on error
+                shutil.move(backup_path, file_path)
+                raise e
+
+        except Exception as e:
+            logging.error(f"Error editing code in {file_path}: {str(e)}")
+            return f"Error: {str(e)}"
+
+    def insert_code_block(
+        self,
+        file_path: str,
+        anchor_block: str,
+        new_block: str,
+        position: str = "after",
+    ) -> Optional[str]:
+        """
+        Insert a new code block before or after a specific anchor block of code.
+
+        Args:
+            file_path (str): Path to the target file
+            anchor_block (str): The code block to use as reference point
+            new_block (str): The new code block to insert
+            position (str): Where to insert the new block ("before" or "after")
+
+        Returns:
+            Optional[str]: Success message, error message, or None if operation fails
+
+        """
+        try:
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"File '{file_path}' not found")
+
+            if position not in ["before", "after"]:
+                raise ValueError("Position must be either 'before' or 'after'")
+
             # Create backup
             backup_path = f"{file_path}.bak"
             shutil.copy2(file_path, backup_path)
 
             try:
+                # Read file content
                 with open(file_path, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
+                    content = f.read()
 
-                if begin_row > len(lines):
+                # Normalize line endings and whitespace
+                anchor_block = anchor_block.strip().replace("\r\n", "\n")
+                new_block = new_block.strip().replace("\r\n", "\n")
+
+                # Find anchor block
+                if anchor_block not in content:
                     raise ValueError(
-                        f"Begin row {begin_row} exceeds file length ({len(lines)} lines)"
-                    )
-                if end_row > len(lines):
-                    raise ValueError(
-                        f"End row {end_row} exceeds file length ({len(lines)} lines)"
+                        "Anchor code block not found in file. "
+                        "Please ensure the anchor block matches exactly."
                     )
 
-                # Ensure code ends with newline
-                if not code.endswith("\n"):
-                    code += "\n"
+                # Find proper indentation based on anchor block
+                anchor_idx = content.find(anchor_block)
+                if position == "after":
+                    # For "after", find the next line's indentation
+                    block_end = anchor_idx + len(anchor_block)
+                    next_line_start = content.find("\n", block_end) + 1
+                    if next_line_start > 0:
+                        next_line_end = content.find("\n", next_line_start)
+                        if next_line_end == -1:
+                            next_line_end = len(content)
+                        next_line = content[next_line_start:next_line_end]
+                        indentation = len(next_line) - len(next_line.lstrip())
+                else:
+                    # For "before", use the anchor block's indentation
+                    line_start = content.rfind("\n", 0, anchor_idx) + 1
+                    indentation = anchor_idx - line_start
 
-                lines[begin_row - 1 : end_row] = [code]
+                # Apply indentation to new block
+                new_block = "\n".join(
+                    " " * indentation + line if line.strip() else line
+                    for line in new_block.split("\n")
+                )
 
+                # Insert the new block
+                if position == "after":
+                    content = content.replace(
+                        anchor_block, f"{anchor_block}\n{new_block}", 1
+                    )
+                else:
+                    content = content.replace(
+                        anchor_block, f"{new_block}\n{anchor_block}", 1
+                    )
+
+                # Ensure file ends with a newline
+                if not content.endswith("\n"):
+                    content += "\n"
+
+                # Write the modified content
                 with open(file_path, "w", encoding="utf-8") as f:
-                    f.writelines(lines)
+                    f.write(content)
 
+                # Remove backup if successful
                 os.remove(backup_path)
-                return f"Code modified successfully between rows {begin_row} and {end_row}"
+
+                return (
+                    f"Code block successfully inserted {position} anchor in {file_path}\n"
+                    f"Anchor block:\n{anchor_block}\n"
+                    f"New block:\n{new_block}"
+                )
 
             except Exception as e:
                 # Restore backup on error
@@ -716,8 +812,10 @@ TASK
                 raise e
 
         except Exception as e:
-            logging.error(f"Error modifying code: {str(e)}")
-            return None
+            logging.error(
+                f"Error inserting code block in {file_path}: {str(e)}"
+            )
+            return f"Error: {str(e)}"
 
     def rewrite_script(self, file_path: str, code: str) -> Optional[str]:
         """
