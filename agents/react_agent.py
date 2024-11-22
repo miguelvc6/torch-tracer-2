@@ -1,12 +1,15 @@
+import difflib
 import json
 import logging
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import textwrap
+from contextlib import contextmanager
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import ollama
 import openai
@@ -393,7 +396,6 @@ TASK
                 error_msg = self.format_message(
                     f"Validation error on attempt {attempt + 1}: {e}",
                     "ERROR",
-                    0,
                 )
                 print(
                     f"Assistant reply on attempt {attempt + 1}:\n{assistant_reply}\n"
@@ -488,7 +490,6 @@ TASK
                 args = json.loads(action.argument)
                 result = self.rewrite_script(args["file_path"], args["code"])
             elif action.request == "end_task":
-                self.handle_end_task(task, action)
                 return "end_task"
             else:
                 raise ValueError(f"Unknown action request: {action.request}")
@@ -625,93 +626,158 @@ TASK
             logging.error(f"Error observing repository: {str(e)}")
             return None
 
+    @contextmanager
+    def _safe_backup(self, file_path: str):
+        """
+        Context manager for safely handling file backups.
+        Creates a temporary backup and ensures proper cleanup.
+        """
+        # Create a temporary directory that will be automatically cleaned up
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Use a temporary file in the temp directory for backup
+            backup_path = os.path.join(
+                temp_dir, os.path.basename(file_path) + ".bak"
+            )
+            try:
+                # Create backup
+                shutil.copy2(file_path, backup_path)
+                yield backup_path
+            except Exception as e:
+                # If backup creation fails, raise immediately
+                raise RuntimeError(f"Failed to create backup: {str(e)}")
+
+    def _normalize_block(self, block: str) -> str:
+        """Normalize a code block by handling whitespace and line endings consistently."""
+        # Normalize line endings
+        block = block.replace("\r\n", "\n")
+
+        # Split into lines and remove any leading/trailing empty lines
+        lines = block.split("\n")
+        while lines and not lines[0].strip():
+            lines.pop(0)
+        while lines and not lines[-1].strip():
+            lines.pop()
+
+        return "\n".join(lines)
+
+    def _detect_indentation(self, block: str) -> Tuple[int, str]:
+        """Detect the base indentation level of a code block."""
+        if not block:
+            return 0, ""
+
+        lines = block.split("\n")
+        # Find first non-empty line
+        for line in lines:
+            if line.strip():
+                return len(line) - len(line.lstrip()), line[
+                    : len(line) - len(line.lstrip())
+                ]
+        return 0, ""
+
+    def _find_best_match(
+        self, content: str, original_block: str
+    ) -> Tuple[str, float, int]:
+        """Find the best matching block in the content using difflib."""
+        normalized_original = self._normalize_block(original_block)
+        lines = content.split("\n")
+        original_lines = normalized_original.split("\n")
+
+        best_ratio = 0
+        best_match = ""
+        best_index = -1
+
+        # Scan through the file with a sliding window
+        for i in range(len(lines) - len(original_lines) + 1):
+            candidate = "\n".join(lines[i : i + len(original_lines)])
+            ratio = difflib.SequenceMatcher(
+                None, normalized_original, candidate
+            ).ratio()
+
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_match = candidate
+                best_index = i
+
+        return best_match, best_ratio, best_index
+
     def edit_code(
         self, file_path: str, original_block: str, new_block: str
     ) -> Optional[str]:
         """
-        Edit code by replacing a specific code block with a new one using a diff-like approach.
-        The tool identifies the exact block to replace, ensuring precision in modifications.
+        Enhanced code block replacement with smart matching and indentation preservation.
 
         Args:
-            file_path (str): Path to the target file
-            original_block (str): The exact code block to be replaced (must match exactly)
-            new_block (str): The new code block to insert
+            file_path: Path to the target file
+            original_block: The code block to be replaced
+            new_block: The new code block to insert
 
         Returns:
-            Optional[str]: Success message, error message, or None if operation fails
+            Optional[str]: Success message or error message
         """
+        if not os.path.exists(file_path):
+            return f"Error: File '{file_path}' not found"
+
         try:
-            if not os.path.exists(file_path):
-                raise FileNotFoundError(f"File '{file_path}' not found")
-
-            # Create backup
-            backup_path = f"{file_path}.bak"
-            shutil.copy2(file_path, backup_path)
-
-            try:
+            # Use the safe backup context manager
+            with self._safe_backup(file_path) as backup_path:
                 # Read file content
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
 
-                # Normalize line endings and whitespace in both blocks
-                original_block = original_block.strip().replace("\r\n", "\n")
-                new_block = new_block.strip().replace("\r\n", "\n")
+                # Normalize blocks
+                normalized_original = self._normalize_block(original_block)
+                normalized_new = self._normalize_block(new_block)
 
-                # Attempt to find the original block
-                if original_block not in content:
-                    # Try with normalized indentation
-                    normalized_original = "\n".join(
-                        line.strip() for line in original_block.split("\n")
+                # First try exact match with normalized content
+                if normalized_original in content:
+                    new_content = content.replace(
+                        normalized_original, normalized_new
                     )
-                    normalized_content = "\n".join(
-                        line.strip() for line in content.split("\n")
+                else:
+                    # Find best matching block
+                    best_match, match_ratio, match_index = (
+                        self._find_best_match(content, normalized_original)
                     )
 
-                    if normalized_original not in normalized_content:
-                        raise ValueError(
-                            "Original code block not found in file. "
-                            "Please ensure the original block matches exactly."
-                        )
-                    else:
-                        # Find the indentation of the original block
-                        start_idx = content.find(
-                            original_block.split("\n")[0].lstrip()
-                        )
-                        leading_whitespace = content[
-                            start_idx
-                            - content[start_idx::-1].find("\n") : start_idx
-                        ]
+                    if match_ratio < 0.8:  # Threshold for minimum similarity
+                        return "Error: Original code block not found in file with sufficient confidence"
 
-                        # Apply original indentation to new block
-                        new_block = "\n".join(
-                            leading_whitespace + line if line.strip() else line
-                            for line in new_block.split("\n")
-                        )
+                    # Detect and preserve indentation
+                    orig_indent_level, orig_indent_str = (
+                        self._detect_indentation(best_match)
+                    )
 
-                # Perform the replacement
-                new_content = content.replace(original_block, new_block)
+                    # Apply original indentation to new block
+                    indented_new_block = "\n".join(
+                        orig_indent_str + line if line.strip() else line
+                        for line in normalized_new.split("\n")
+                    )
 
-                # Ensure file ends with a newline
+                    # Perform replacement using string slicing for precise replacement
+                    lines = content.split("\n")
+                    lines[
+                        match_index : match_index + len(best_match.split("\n"))
+                    ] = indented_new_block.split("\n")
+                    new_content = "\n".join(lines)
+
+                # Ensure file ends with newline
                 if not new_content.endswith("\n"):
                     new_content += "\n"
 
-                # Write the modified content
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(new_content)
-
-                # Remove backup if successful
-                os.remove(backup_path)
+                try:
+                    # Write modified content
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        f.write(new_content)
+                except Exception as write_error:
+                    # If writing fails, restore from backup and raise
+                    shutil.copy2(backup_path, file_path)
+                    raise write_error
 
                 return (
-                    f"Code block successfully replaced in {file_path}\n"
-                    f"Original block:\n{original_block}\n"
-                    f"New block:\n{new_block}"
+                    "Code block successfully replaced\n"
+                    f"File: {file_path}\n"
+                    f"Match confidence: {match_ratio:.2%}"
                 )
-
-            except Exception as e:
-                # Restore backup on error
-                shutil.move(backup_path, file_path)
-                raise e
 
         except Exception as e:
             logging.error(f"Error editing code in {file_path}: {str(e)}")
@@ -957,8 +1023,10 @@ the second book of the series. You will be evaluated on the completeness and cor
 At the end of the task, I will personally review the code and evaluate your work. The nine scenes that are rendered \
 in the book must be rendered correctly.
 
+For now let's focus on the second chapter of the book, 'Motion Blur', since the first one is only an overview.
+
 I recommend you to start the task by using the observe_repository tool to get a view of the current code. \
-Then you need you should start implementing the code of the book's sections sequentially. \
+Then you need you should start reading the two first sections of the book, and implement the code described in them.
 Use the same style and structure as in the currently implemented code.
 """
 

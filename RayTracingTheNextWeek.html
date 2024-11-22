@@ -68,27 +68,22 @@ Since the “engine” of the ray tracer can just make sure the objects are wher
 each ray, the intersection guts don’t change much. To accomplish this, we need to store the exact
 time for each ray:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class ray {
       public:
         ray() {}
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         ray(const point3& origin, const vec3& direction, double time)
           : orig(origin), dir(direction), tm(time) {}
 
         ray(const point3& origin, const vec3& direction)
-          : ray(origin, direction, 0) {}
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+          : ray(origin, direction, 0) {}+
 
         const point3& origin() const  { return orig; }
         const vec3& direction() const { return dir; }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-        double time() const { return tm; }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        double time() const { return tm; }+
 
         point3 at(double t) const {
             return orig + t*dir;
@@ -97,9 +92,7 @@ time for each ray:
       private:
         point3 orig;
         vec3 dir;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         double tm;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [time-ray]: <kbd>[ray.h]</kbd> Ray with time information]
@@ -142,7 +135,6 @@ calls simple, so I will make the camera keep track, but that’s a personal pref
 changes are needed to camera because for now it is not allowed to move; it just sends out rays over
 a time period.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class camera {
       ...
       private:
@@ -158,11 +150,9 @@ a time period.
 
             auto ray_origin = (defocus_angle <= 0) ? center : defocus_disk_sample();
             auto ray_direction = pixel_sample - ray_origin;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             auto ray_time = random_double();
 
             return ray(ray_origin, ray_direction, ray_time);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
 
         ...
@@ -179,10 +169,8 @@ interval, so it really can be sampled at any time.) We'll do this by replacing t
 with a 3D ray that describes the original position at time=0 and the displacement to the end
 position at time=1.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class sphere : public hittable {
       public:
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         // Stationary Sphere
         sphere(const point3& static_center, double radius, shared_ptr<material> mat)
           : center(static_center, vec3(0,0,0)), radius(std::fmax(0,radius)), mat(mat) {}
@@ -190,15 +178,12 @@ position at time=1.
         // Moving Sphere
         sphere(const point3& center1, const point3& center2, double radius,
                shared_ptr<material> mat)
-          : center(center1, center2 - center1), radius(std::fmax(0,radius)), mat(mat) {}
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+          : center(center1, center2 - center1), radius(std::fmax(0,radius)), mat(mat) {}+
 
         ...
 
       private:
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         ray center;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         double radius;
         shared_ptr<material> mat;
 
@@ -211,15 +196,12 @@ position at time=1.
 The updated `sphere::hit()` function is almost identical to the old `sphere::hit()` function:
 we just need to now determine the current position of the animated center:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class sphere : public hittable {
       public:
         ...
         bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             point3 current_center = center.at(r.time());
             vec3 oc = current_center - r.origin();
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             auto a = r.direction().length_squared();
             auto h = dot(r.direction(), oc);
             auto c = oc.length_squared() - radius*radius;
@@ -228,9 +210,7 @@ we just need to now determine the current position of the animated center:
 
             rec.t = root;
             rec.p = r.at(rec.t);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             vec3 outward_normal = (rec.p - current_center) / radius;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             rec.set_face_normal(r, outward_normal);
             get_sphere_uv(outward_normal, rec.u, rec.v);
             rec.mat = mat;
@@ -250,7 +230,6 @@ Tracking the Time of Ray Intersection
 Now that rays have a time property, we need to update the `material::scatter()` methods to account
 for the time of intersection:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class lambertian : public material {
         ...
         bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered)
@@ -262,9 +241,7 @@ for the time of intersection:
                 scatter_direction = rec.normal;
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             scattered = ray(rec.p, scatter_direction, r_in.time());
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             attenuation = albedo;
             return true;
         }
@@ -277,9 +254,7 @@ for the time of intersection:
         const override {
             vec3 reflected = reflect(r_in.direction(), rec.normal);
             reflected = unit_vector(reflected) + (fuzz * random_unit_vector());
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             scattered = ray(rec.p, reflected, r_in.time());
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             attenuation = albedo;
 
             return (dot(scattered.direction(), rec.normal) > 0);
@@ -292,9 +267,7 @@ for the time of intersection:
         bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered)
         const override {
             ...
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             scattered = ray(rec.p, direction, r_in.time());
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             return true;
         }
         ...
@@ -309,7 +282,6 @@ The code below takes the example diffuse spheres from the scene at the end of th
 makes them move during the image render. Each sphere moves from its center $\mathbf{C}$ at time
 $t=0$ to $\mathbf{C} + (0, r/2, 0)$ at time $t=1$:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     int main() {
         hittable_list world;
 
@@ -328,10 +300,8 @@ $t=0$ to $\mathbf{C} + (0, r/2, 0)$ at time $t=1$:
                         // diffuse
                         auto albedo = color::random() * color::random();
                         sphere_material = make_shared<lambertian>(albedo);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
                         auto center2 = center + vec3(0, random_double(0,.5), 0);
                         world.add(make_shared<sphere>(center, center2, 0.2, sphere_material));
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
                     } else if (choose_mat < 0.95) {
                     ...
         }
@@ -340,10 +310,8 @@ $t=0$ to $\mathbf{C} + (0, r/2, 0)$ at time $t=1$:
         camera cam;
 
         cam.aspect_ratio      = 16.0 / 9.0;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         cam.image_width       = 400;
         cam.samples_per_pixel = 100;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         cam.max_depth         = 50;
 
         cam.vfov     = 20;
@@ -567,7 +535,6 @@ because in a ray tracer all cases come up eventually).
 To accomplish this, we'll first add a new `interval` function `expand`, which pads an interval by a
 given amount:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class interval {
       public:
         ...
@@ -578,12 +545,10 @@ given amount:
         }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         interval expand(double delta) const {
             auto padding = delta/2;
             return interval(min - padding, max + padding);
-        }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        }+
 
         static const interval empty, universe;
     };
@@ -595,8 +560,7 @@ given amount:
 <div class='together'>
 Now we have everything we need to implement the new AABB class.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #ifndef AABB_H
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ndef AABB_H
     #define AABB_H
 
     class aabb {
@@ -672,9 +636,7 @@ we've designed our interval class, the math all works out.
 Finally, recall that some objects may be animated. Such objects should return their bounds over the
 entire range of motion, from time=0 to time=1.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-    #include "aabb.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    #include "aabb.h"+
 
     class material;
 
@@ -687,42 +649,33 @@ entire range of motion, from time=0 to time=1.
         virtual bool hit(const ray& r, interval ray_t, hit_record& rec) const = 0;
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         virtual aabb bounding_box() const = 0;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [hittable-bbox]: <kbd>[hittable.h]</kbd> Hittable class with bounding box]
 
 For a stationary sphere, the `bounding_box` function is easy:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class sphere : public hittable {
       public:
         // Stationary Sphere
         sphere(const point3& static_center, double radius, shared_ptr<material> mat)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
           : center(static_center, vec3(0,0,0)), radius(std::fmax(0,radius)), mat(mat)
         {
             auto rvec = vec3(radius, radius, radius);
             bbox = aabb(static_center - rvec, static_center + rvec);
-        }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        }+
 
         ...
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-        aabb bounding_box() const override { return bbox; }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        aabb bounding_box() const override { return bbox; }+
 
       private:
         ray center;
         double radius;
         shared_ptr<material> mat;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-        aabb bbox;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        aabb bbox;+
 
         ...
     };
@@ -733,7 +686,6 @@ For a moving sphere, we want the bounds of its entire range of motion. To do thi
 box of the sphere at time=0, and the box of the sphere at time=1, and compute the box around those
 two boxes.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class sphere : public hittable {
       public:
         ...
@@ -741,15 +693,13 @@ two boxes.
         // Moving Sphere
         sphere(const point3& center1, const point3& center2, double radius,
                shared_ptr<material> mat)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
           : center(center1, center2 - center1), radius(std::fmax(0,radius)), mat(mat)
         {
             auto rvec = vec3(radius, radius, radius);
             aabb box1(center.at(0) - rvec, center.at(0) + rvec);
             aabb box2(center.at(1) - rvec, center.at(1) + rvec);
             bbox = aabb(box1, box2);
-        }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        }+
 
         ...
     };
@@ -760,7 +710,6 @@ two boxes.
 Now we need a new `aabb` constructor that takes two boxes as input. First, we'll add a new interval
 constructor to do this:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class interval {
       public:
         double min, max;
@@ -770,13 +719,11 @@ constructor to do this:
         interval(double _min, double _max) : min(_min), max(_max) {}
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         interval(const interval& a, const interval& b) {
             // Create the interval tightly enclosing the two input intervals.
             min = a.min <= b.min ? a.min : b.min;
             max = a.max >= b.max ? a.max : b.max;
-        }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        }+
 
         double size() const {
         ...
@@ -788,7 +735,6 @@ constructor to do this:
 <div class='together'>
 Now we can use this to construct an axis-aligned bounding box from two input boxes.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class aabb {
       public:
         ...
@@ -798,13 +744,11 @@ Now we can use this to construct an axis-aligned bounding box from two input box
         }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         aabb(const aabb& box0, const aabb& box1) {
             x = interval(box0.x, box1.x);
             y = interval(box0.y, box1.y);
             z = interval(box0.z, box1.z);
-        }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        }+
 
         ...
     };
@@ -819,10 +763,8 @@ Creating Bounding Boxes of Lists of Objects
 Now we'll update the `hittable_list` object, computing the bounds of its children. We'll update the
 bounding box incrementally as each new child is added.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     #include "aabb.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "hittable.h"
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "hittable.h"
 
     #include <vector>
 
@@ -833,9 +775,7 @@ bounding box incrementally as each new child is added.
         ...
         void add(shared_ptr<hittable> object) {
             objects.push_back(object);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             bbox = aabb(bbox, object->bounding_box());
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
 
         bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
@@ -843,12 +783,10 @@ bounding box incrementally as each new child is added.
         }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         aabb bounding_box() const override { return bbox; }
 
       private:
         aabb bbox;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [hit-list-bbox]: <kbd>[hittable_list.h]</kbd> Hittable list with bounding box]
@@ -865,8 +803,7 @@ box for the node is hit, and if so, check the children and sort out any details.
 <div class='together'>
 I am a fan of the one class design when feasible. Here is such a class:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #ifndef BVH_H
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ndef BVH_H
     #define BVH_H
 
     #include "aabb.h"
@@ -931,22 +868,18 @@ one recursion would probably help a little, but I figure the whole method will g
 The following code uses three methods--`box_x_compare`, `box_y_compare_`, and `box_z_compare`--that
 we haven't yet defined.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "aabb.h"
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "aabb.h"
     #include "hittable.h"
     #include "hittable_list.h"
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-    #include <algorithm>
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    #include <algorithm>+
 
     class bvh_node : public hittable {
       public:
         ...
 
         bvh_node(std::vector<shared_ptr<hittable>>& objects, size_t start, size_t end) {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             int axis = random_int(0,2);
 
             auto comparator = (axis == 0) ? box_x_compare
@@ -969,7 +902,6 @@ we haven't yet defined.
             }
 
             bbox = aabb(left->bounding_box(), right->bounding_box());
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
 
         ...
@@ -980,7 +912,6 @@ we haven't yet defined.
 <div class='together'>
 This uses a new function: `random_int()`:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     ...
 
     inline double random_double(double min, double max) {
@@ -989,12 +920,10 @@ This uses a new function: `random_int()`:
     }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     inline int random_int(int min, int max) {
         // Returns a random integer in [min,max].
         return int(random_double(min, max+1));
-    }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    }+
 
     ...
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1014,7 +943,6 @@ generic comparator returns true if the first argument is less than the second, g
 axis index argument. Then define axis-specific comparison functions that use the generic comparison
 function.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class bvh_node : public hittable {
       ...
 
@@ -1024,7 +952,6 @@ function.
         aabb bbox;
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         static bool box_compare(
             const shared_ptr<hittable> a, const shared_ptr<hittable> b, int axis_index
         ) {
@@ -1044,21 +971,17 @@ function.
         static bool box_z_compare (const shared_ptr<hittable> a, const shared_ptr<hittable> b) {
             return box_compare(a, b, 2);
         }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [bvh-x-comp]: <kbd>[bvh.h]</kbd> BVH comparison function, X-axis]
 
 At this point, we're ready to use our new BVH code. Let's use it on our random spheres scene.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "rtweekend.h"
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "rtweekend.h"
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     #include "bvh.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "camera.h"
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "camera.h"
     #include "hittable.h"
     #include "hittable_list.h"
     #include "material.h"
@@ -1074,9 +997,7 @@ At this point, we're ready to use our new BVH code. Let's use it on our random s
         world.add(make_shared<sphere>(point3(4, 1, 0), 1.0, material3));
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-        world = hittable_list(make_shared<bvh_node>(world));
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        world = hittable_list(make_shared<bvh_node>(world));+
 
         camera cam;
 
@@ -1106,19 +1027,16 @@ imagine a function that does that for us: `aabb::longest_axis()`. Finally, since
 bounding box of the object span up front, we can delete the original line that computed it as the
 union of the left and right sides.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class bvh_node : public hittable {
       public:
         ...
         bvh_node(std::vector<shared_ptr<hittable>>& objects, size_t start, size_t end) {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             // Build the bounding box of the span of source objects.
             bbox = aabb::empty;
             for (size_t object_index=start; object_index < end; object_index++)
                 bbox = aabb(bbox, objects[object_index]->bounding_box());
 
-            int axis = bbox.longest_axis();
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+            int axis = bbox.longest_axis();+
 
             auto comparator = (axis == 0) ? box_x_compare
                             : (axis == 1) ? box_y_compare
@@ -1126,10 +1044,8 @@ union of the left and right sides.
 
             ...
 
-
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ delete
++ delete
             bbox = aabb(left->bounding_box(), right->bounding_box());
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
 
         ...
@@ -1138,7 +1054,6 @@ union of the left and right sides.
 
 Now to implement the empty `aabb` code and the new `aabb::longest_axis()` function:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class aabb {
       public:
         ...
@@ -1148,7 +1063,6 @@ Now to implement the empty `aabb` code and the new `aabb::longest_axis()` functi
         }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         int longest_axis() const {
             // Returns the index of the longest axis of the bounding box.
 
@@ -1159,11 +1073,9 @@ Now to implement the empty `aabb` code and the new `aabb::longest_axis()` functi
         }
 
         static const aabb empty, universe;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     const aabb aabb::empty    = aabb(interval::empty,    interval::empty,    interval::empty);
     const aabb aabb::universe = aabb(interval::universe, interval::universe, interval::universe);
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1208,8 +1120,7 @@ apparent later.
 Constant Color Texture
 -----------------------
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #ifndef TEXTURE_H
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ndef TEXTURE_H
     #define TEXTURE_H
 
     class texture {
@@ -1240,17 +1151,14 @@ Constant Color Texture
 We'll need to update the `hit_record` structure to store the $u,v$ surface coordinates of the
 ray-object hit point.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class hit_record {
       public:
         vec3 p;
         vec3 normal;
         shared_ptr<material> mat;
         double t;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         double u;
         double v;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         bool front_face;
 
         ...
@@ -1284,7 +1192,6 @@ gives us either 0 or 1. Zero maps to the even color, and one to the odd color.
 Finally, we add a scaling factor to the texture, to allow us to control the size of the checker
 pattern in the scene.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class checker_texture : public texture {
       public:
         checker_texture(double scale, shared_ptr<texture> even, shared_ptr<texture> odd)
@@ -1318,20 +1225,15 @@ texture. This is in the spirit of shader networks introduced by Pat Hanrahan bac
 To support procedural textures, we'll extend the `lambertian` class to work with textures instead of
 colors:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "hittable.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-    #include "texture.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "hittable.h"
+    #include "texture.h"+
 
     ...
 
     class lambertian : public material {
       public:
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         lambertian(const color& albedo) : tex(make_shared<solid_color>(albedo)) {}
-        lambertian(shared_ptr<texture> tex) : tex(tex) {}
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        lambertian(shared_ptr<texture> tex) : tex(tex) {}+
 
         bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered)
         const override {
@@ -1342,16 +1244,12 @@ colors:
                 scatter_direction = rec.normal;
 
             scattered = ray(rec.p, scatter_direction, r_in.time());
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             attenuation = tex->value(rec.u, rec.v, rec.p);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             return true;
         }
 
       private:
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         shared_ptr<texture> tex;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [lambertian-textured]: <kbd>[material.h]</kbd> Lambertian material with texture]
@@ -1361,8 +1259,7 @@ colors:
 <div class='together'>
 If we add this to our main scene:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "rtweekend.h"
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "rtweekend.h"
 
     #include "bvh.h"
     #include "camera.h"
@@ -1370,19 +1267,15 @@ If we add this to our main scene:
     #include "hittable_list.h"
     #include "material.h"
     #include "sphere.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-    #include "texture.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    #include "texture.h"+
 
 
     int main() {
         hittable_list world;
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         auto checker = make_shared<checker_texture>(0.32, color(.2, .3, .1), color(.9, .9, .9));
-        world.add(make_shared<sphere>(point3(0,-1000,0), 1000, make_shared<lambertian>(checker)));
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        world.add(make_shared<sphere>(point3(0,-1000,0), 1000, make_shared<lambertian>(checker)));+
 
         for (int a = -11; a < 11; a++) {
         ...
@@ -1413,8 +1306,7 @@ command-line arguments.
 Here's what our main.cc looks like after refactoring for our single random spheres scene. Rename
 `main()` to `bouncing_spheres()`, and add a new `main()` function to call it:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "rtweekend.h"
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "rtweekend.h"
 
     #include "bvh.h"
     #include "camera.h"
@@ -1424,12 +1316,9 @@ Here's what our main.cc looks like after refactoring for our single random spher
     #include "sphere.h"
     #include "texture.h"
 
-
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ delete
++ delete
     int main() {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     void bouncing_spheres() {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         hittable_list world;
 
         auto ground_material = make_shared<lambertian>(color(0.5, 0.5, 0.5));
@@ -1441,7 +1330,6 @@ Here's what our main.cc looks like after refactoring for our single random spher
     }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     int main() {
         bouncing_spheres();
     }
@@ -1453,8 +1341,7 @@ Here's what our main.cc looks like after refactoring for our single random spher
 <div class='together'>
 Now add a scene with two checkered spheres, one atop the other.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "rtweekend.h"
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "rtweekend.h"
 
     #include "bvh.h"
     #include "camera.h"
@@ -1470,7 +1357,6 @@ Now add a scene with two checkered spheres, one atop the other.
     }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     void checkered_spheres() {
         hittable_list world;
 
@@ -1494,16 +1380,13 @@ Now add a scene with two checkered spheres, one atop the other.
         cam.defocus_angle = 0;
 
         cam.render(world);
-    }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    }+
 
     int main() {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         switch (2) {
             case 1: bouncing_spheres();  break;
             case 2: checkered_spheres(); break;
         }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     }
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [main-two-spheres]: <kbd>[main.cc]</kbd> Two checkered spheres]
@@ -1581,14 +1464,12 @@ The derivation for $\theta$ is more straightforward:
 So for a sphere, the $(u,v)$ coord computation is accomplished by a utility function that takes
 points on the unit sphere centered at the origin, and computes $u$ and $v$:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class sphere : public hittable {
       ...
       private:
         ...
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         static void get_sphere_uv(const point3& p, double& u, double& v) {
             // p: a given point on the sphere of radius one, centered at the origin.
             // u: returned value [0,1] of angle around the Y axis from X=-1.
@@ -1603,7 +1484,6 @@ points on the unit sphere centered at the origin, and computes $u$ and $v$:
             u = phi / (2*pi);
             v = theta / pi;
         }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [get-sphere-uv]: <kbd>[sphere.h]</kbd> get_sphere_uv function]
@@ -1613,7 +1493,6 @@ points on the unit sphere centered at the origin, and computes $u$ and $v$:
 <div class='together'>
 Update the `sphere::hit()` function to use this function to update the hit record UV coordinates.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class sphere : public hittable {
       public:
         ...
@@ -1624,9 +1503,7 @@ Update the `sphere::hit()` function to use this function to update the hit recor
             rec.p = r.at(rec.t);
             vec3 outward_normal = (rec.p - current_center) / radius;
             rec.set_face_normal(r, outward_normal);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             get_sphere_uv(outward_normal, rec.u, rec.v);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             rec.mat = mat;
 
             return true;
@@ -1668,8 +1545,7 @@ byte values for each pixel. The following listing assumes that you have copied t
 header into a folder called `external`. Adjust according to your directory structure.
 
 <script type="preformatted">
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #ifndef RTW_STB_IMAGE_H
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ndef RTW_STB_IMAGE_H
     #define RTW_STB_IMAGE_H
 
     // Disable strict warnings for this header from the Microsoft Visual C++ compiler.
@@ -1805,9 +1681,7 @@ write) an image loading library that provides similar functionality.
 <div class='together'>
 The `image_texture` class uses the `rtw_image` class:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-    #include "rtw_stb_image.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    #include "rtw_stb_image.h"+
 
     ...
 
@@ -1816,7 +1690,6 @@ The `image_texture` class uses the `rtw_image` class:
     };
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     class image_texture : public texture {
       public:
         image_texture(const char* filename) : image(filename) {}
@@ -1855,7 +1728,6 @@ I just grabbed a random earth map from the web -- any standard projection will d
 <div class='together'>
 Here's the code to read an image from a file and then assign it to a diffuse material:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     void earth() {
         auto earth_texture = make_shared<image_texture>("earthmap.jpg");
         auto earth_surface = make_shared<lambertian>(earth_texture);
@@ -1876,18 +1748,13 @@ Here's the code to read an image from a file and then assign it to a diffuse mat
         cam.defocus_angle = 0;
 
         cam.render(hittable_list(globe));
-    }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    }+
 
     int main() {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         switch (3) {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             case 1:  bouncing_spheres();  break;
             case 2:  checkered_spheres(); break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             case 3:  earth();             break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
     }
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1940,8 +1807,7 @@ something blocky where the repeating is clear:
 Let’s just use some sort of hashing to scramble this, instead of tiling. This has a bit of support
 code to make it all happen:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #ifndef PERLIN_H
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ndef PERLIN_H
     #define PERLIN_H
 
     class perlin {
@@ -1997,14 +1863,11 @@ code to make it all happen:
 <div class='together'>
 Now if we create an actual texture that takes these floats between 0 and 1 and creates grey colors:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     #include "perlin.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "rtw_stb_image.h"
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "rtw_stb_image.h"
 
     ...
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     class noise_texture : public texture {
       public:
         noise_texture() {}
@@ -2024,7 +1887,6 @@ Now if we create an actual texture that takes these floats between 0 and 1 and c
 <div class='together'>
 We can use that texture on some spheres:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     void perlin_spheres() {
         hittable_list world;
 
@@ -2047,19 +1909,14 @@ We can use that texture on some spheres:
         cam.defocus_angle = 0;
 
         cam.render(world);
-    }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    }+
 
     int main() {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         switch (4) {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             case 1:  bouncing_spheres();   break;
             case 2:  checkered_spheres();  break;
             case 3:  earth();              break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             case 4:  perlin_spheres();     break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
     }
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2079,15 +1936,13 @@ Add the hashing does scramble as hoped:
 Smoothing out the Result
 -------------------------
 To make it smooth, we can linearly interpolate:
-
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
++
 
     class perlin {
       public:
         ...
 
         double noise(const point3& p) const {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             auto u = p.x() - std::floor(p.x());
             auto v = p.y() - std::floor(p.y());
             auto w = p.z() - std::floor(p.z());
@@ -2107,7 +1962,6 @@ To make it smooth, we can linearly interpolate:
                         ];
 
             return trilinear_interp(c, u, v, w);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
 
         ...
@@ -2120,7 +1974,6 @@ To make it smooth, we can linearly interpolate:
         }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         static double trilinear_interp(double c[2][2][2], double u, double v, double w) {
             auto accum = 0.0;
             for (int i=0; i < 2; i++)
@@ -2133,7 +1986,6 @@ To make it smooth, we can linearly interpolate:
 
             return accum;
         }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [perlin-trilinear]: <kbd>[perlin.h]</kbd> Perlin with trilinear interpolation]
@@ -2153,7 +2005,6 @@ Smoothing yields an improved result, but there are obvious grid features in ther
 Mach bands, a known perceptual artifact of linear interpolation of color. A standard trick is to use
 a Hermite cubic to round off the interpolation:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class perlin (
       public:
         ...
@@ -2162,11 +2013,9 @@ a Hermite cubic to round off the interpolation:
             auto v = p.y() - std::floor(p.y());
             auto w = p.z() - std::floor(p.z());
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             u = u*u*(3-2*u);
             v = v*v*(3-2*v);
-            w = w*w*(3-2*w);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+            w = w*w*(3-2*w);+
 
             auto i = int(std::floor(p.x()));
             auto j = int(std::floor(p.y()));
@@ -2188,24 +2037,17 @@ Tweaking The Frequency
 -----------------------
 It is also a bit low frequency. We can scale the input point to make it vary more quickly:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class noise_texture : public texture {
       public:
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-        noise_texture(double scale) : scale(scale) {}
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        noise_texture(double scale) : scale(scale) {}+
 
         color value(double u, double v, const point3& p) const override {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             return color(1,1,1) * noise.noise(scale * p);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
 
       private:
         perlin noise;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         double scale;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [perlin-smoothed-2]: <kbd>[texture.h]</kbd> Perlin smoothed, higher frequency]
@@ -2213,12 +2055,9 @@ It is also a bit low frequency. We can scale the input point to make it vary mor
 <div class='together'>
 We then add that scale to the `perlin_spheres()` scene description:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     void perlin_spheres() {
         ...
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         auto pertext = make_shared<noise_texture>(4);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         world.add(make_shared<sphere>(point3(0,-1000,0), 1000, make_shared<lambertian>(pertext)));
         world.add(make_shared<sphere>(point3(0, 2, 0), 2, make_shared<lambertian>(pertext)));
 
@@ -2247,14 +2086,11 @@ exactly on the integer x/y/z. Ken Perlin’s very clever trick was to instead pu
 the lattice. So, first we need to change the random floats to random vectors. These vectors are any
 reasonable set of irregular directions, and I won't bother to make them exactly uniform:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class perlin {
       public:
         perlin() {
             for (int i = 0; i < point_count; i++) {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
                 randvec[i] = unit_vector(vec3::random(-1,1));
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             }
 
             perlin_generate_perm(perm_x);
@@ -2266,9 +2102,7 @@ reasonable set of irregular directions, and I won't bother to make them exactly 
 
       private:
         static const int point_count = 256;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         vec3 randvec[point_count];
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         int perm_x[point_count];
         int perm_y[point_count];
         int perm_z[point_count];
@@ -2280,42 +2114,33 @@ reasonable set of irregular directions, and I won't bother to make them exactly 
 <div class='together'>
 The Perlin class `noise()` method is now:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class perlin {
       public:
         ...
         double noise(const point3& p) const {
             auto u = p.x() - std::floor(p.x());
             auto v = p.y() - std::floor(p.y());
-            auto w = p.z() - std::floor(p.z());
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ delete
+            auto w = p.z() - std::floor(p.z());+ delete
             u = u*u*(3-2*u);
             v = v*v*(3-2*v);
-            w = w*w*(3-2*w);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+            w = w*w*(3-2*w);+
 
             auto i = int(std::floor(p.x()));
             auto j = int(std::floor(p.y()));
             auto k = int(std::floor(p.z()));
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-            vec3 c[2][2][2];
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+            vec3 c[2][2][2];+
 
             for (int di=0; di < 2; di++)
                 for (int dj=0; dj < 2; dj++)
                     for (int dk=0; dk < 2; dk++)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
                         c[di][dj][dk] = randvec[
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
                             perm_x[(i+di) & 255] ^
                             perm_y[(j+dj) & 255] ^
                             perm_z[(k+dk) & 255]
                         ];
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             return perlin_interp(c, u, v, w);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
 
         ...
@@ -2328,19 +2153,15 @@ The Perlin class `noise()` method is now:
 <div class='together'>
 And the interpolation becomes a bit more complicated:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class perlin {
       ...
       private:
-        ...
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ delete
+        ...+ delete
         static double trilinear_interp(double c[2][2][2], double u, double v, double w) {
             ...
-        }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        }+
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         static double perlin_interp(const vec3 c[2][2][2], double u, double v, double w) {
             auto uu = u*u*(3-2*u);
             auto vv = v*v*(3-2*v);
@@ -2359,7 +2180,6 @@ And the interpolation becomes a bit more complicated:
 
             return accum;
         }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [perlin-interp]: <kbd>[perlin.h]</kbd> Perlin interpolation function so far]
@@ -2370,15 +2190,12 @@ The output of the Perlin interpolation function can return negative values. Thes
 will be passed to our `linear_to_gamma()` color function, which expects only positive inputs. To
 mitigate this, we'll map the $[-1,+1]$ range of values to $[0,1]$.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class noise_texture : public texture {
       public:
         noise_texture(double scale) : scale(scale) {}
 
         color value(double u, double v, const point3& p) const override {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             return color(1,1,1) * 0.5 * (1.0 + noise.noise(scale * p));
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
 
       private:
@@ -2402,7 +2219,6 @@ Introducing Turbulence
 Very often, a composite noise that has multiple summed frequencies is used. This is usually called
 turbulence, and is a sum of repeated calls to noise:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class perlin {
       ...
       public:
@@ -2413,7 +2229,6 @@ turbulence, and is a sum of repeated calls to noise:
         }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         double turb(const point3& p, int depth) const {
             auto accum = 0.0;
             auto temp_p = p;
@@ -2426,23 +2241,19 @@ turbulence, and is a sum of repeated calls to noise:
             }
 
             return std::fabs(accum);
-        }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        }+
 
         ...
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [perlin-turb]: <kbd>[perlin.h]</kbd> Turbulence function]
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class noise_texture : public texture {
       public:
         noise_texture(double scale) : scale(scale) {}
 
         color value(double u, double v, const point3& p) const override {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             return color(1,1,1) * noise.turb(p, 7);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
 
       private:
@@ -2469,15 +2280,12 @@ like a sine function, and use turbulence to adjust the phase (so it shifts $x$ i
 makes the stripes undulate. Commenting out straight noise and turbulence, and giving a marble-like
 effect is:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class noise_texture : public texture {
       public:
         noise_texture(double scale) : scale(scale) {}
 
         color value(double u, double v, const point3& p) const override {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             return color(.5, .5, .5) * (1 + std::sin(scale * p.z() + 10 * noise.turb(p, 7)));
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
 
       private:
@@ -2537,18 +2345,15 @@ remove the possibility of numerical problems, and the bounds are just a rough ap
 actual shape anyway. To remedy this situation, we insert a small padding to ensure that newly
 constructed AABBs always have a non-zero volume:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     ...
     class aabb {
       public:
         ...
         aabb(const interval& x, const interval& y, const interval& z)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
           : x(x), y(y), z(z)
         {
             pad_to_minimums();
-        }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        }+
 
 
         aabb(const point3& a, const point3& b) {
@@ -2560,15 +2365,12 @@ constructed AABBs always have a non-zero volume:
             z = interval(std::fmin(a[2],b[2]), std::fmax(a[2],b[2]));
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             pad_to_minimums();
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
         ...
         static const aabb empty, universe;
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
       private:
 
         void pad_to_minimums() {
@@ -2579,7 +2381,6 @@ constructed AABBs always have a non-zero volume:
             if (y.size() < delta) y = y.expand(delta);
             if (z.size() < delta) z = z.expand(delta);
         }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [aabb]: <kbd>[aabb.h]</kbd> New aabb::pad_to_minimums() method]
@@ -2589,8 +2390,7 @@ constructed AABBs always have a non-zero volume:
 <div class='together'>
 Now we're ready for the first sketch of the new `quad` class:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #ifndef QUAD_H
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ndef QUAD_H
     #define QUAD_H
 
     #include "hittable.h"
@@ -2719,17 +2519,14 @@ know that $\mathbf{Q}$ lies on the plane, so that's enough to solve for $D$:
 <div class='together'>
 Add the planar values to the `quad` class:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class quad : public hittable {
       public:
         quad(const point3& Q, const vec3& u, const vec3& v, shared_ptr<material> mat)
           : Q(Q), u(u), v(v), mat(mat)
         {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             auto n = cross(u, v);
             normal = unit_vector(n);
-            D = dot(normal, Q);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+            D = dot(normal, Q);+
 
             set_bounding_box();
         }
@@ -2740,10 +2537,8 @@ Add the planar values to the `quad` class:
         vec3 u, v;
         shared_ptr<material> mat;
         aabb bbox;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         vec3 normal;
         double D;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [quad-plane1]: <kbd>[quad.h]</kbd> Caching the planar values]
@@ -2756,12 +2551,10 @@ and the plane containing the quadrilateral.
 As an incremental step, let's implement the `hit()` method to handle the infinite plane containing
 our quadrilateral.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class quad : public hittable {
         ...
 
         bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             auto denom = dot(normal, r.direction());
 
             // No hit if the ray is parallel to the plane.
@@ -2781,7 +2574,6 @@ our quadrilateral.
             rec.set_face_normal(r, normal);
 
             return true;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
 
         ...
@@ -2836,7 +2628,6 @@ where
 
 The vector $\mathbf{w}$ is constant for a given quadrilateral, so we'll cache that value.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class quad : public hittable {
       public:
         quad(const point3& Q, const vec3& u, const vec3& v, shared_ptr<material> mat)
@@ -2845,9 +2636,7 @@ The vector $\mathbf{w}$ is constant for a given quadrilateral, so we'll cache th
             auto n = cross(u, v);
             normal = unit_vector(n);
             D = dot(normal, Q);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-            w = n / dot(n,n);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+            w = n / dot(n,n);+
 
             set_bounding_box();
         }
@@ -2857,9 +2646,7 @@ The vector $\mathbf{w}$ is constant for a given quadrilateral, so we'll cache th
       private:
         point3 Q;
         vec3 u, v;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         vec3 w;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         shared_ptr<material> mat;
         aabb bbox;
         vec3 normal;
@@ -2973,7 +2760,6 @@ That's the last piece needed to implement quadrilateral primitives.
 In order to make such experimentation a bit easier, we'll factor out the $(\alpha,\beta)$ interior
 test method from the hit method.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class quad : public hittable {
       public:
         ...
@@ -2991,11 +2777,8 @@ test method from the hit method.
                 return false;
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             // Determine if the hit point lies within the planar shape using its plane coordinates.
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             auto intersection = r.at(t);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             vec3 planar_hitpt_vector = intersection - Q;
             auto alpha = dot(w, cross(planar_hitpt_vector, v));
             auto beta = dot(w, cross(u, planar_hitpt_vector));
@@ -3004,7 +2787,6 @@ test method from the hit method.
                 return false;
 
             // Ray hits the 2D shape; set the rest of the hit record and return true.
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             rec.t = t;
             rec.p = intersection;
             rec.mat = mat;
@@ -3014,7 +2796,6 @@ test method from the hit method.
         }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         virtual bool is_interior(double a, double b, hit_record& rec) const {
             interval unit_interval = interval(0, 1);
             // Given the hit point in plane coordinates, return false if it is outside the
@@ -3026,8 +2807,7 @@ test method from the hit method.
             rec.u = a;
             rec.v = b;
             return true;
-        }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        }+
 
       private:
         point3 Q;
@@ -3044,24 +2824,20 @@ test method from the hit method.
 <div class='together'>
 And now we add a new scene to demonstrate our new `quad` primitive:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "rtweekend.h"
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "rtweekend.h"
 
     #include "bvh.h"
     #include "camera.h"
     #include "hittable.h"
     #include "hittable_list.h"
     #include "material.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     #include "quad.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "sphere.h"
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "sphere.h"
     #include "texture.h"
 
     ...
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     void quads() {
         hittable_list world;
 
@@ -3094,20 +2870,15 @@ And now we add a new scene to demonstrate our new `quad` primitive:
         cam.defocus_angle = 0;
 
         cam.render(world);
-    }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    }+
 
     int main() {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         switch (5) {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             case 1:  bouncing_spheres();   break;
             case 2:  checkered_spheres();  break;
             case 3:  earth();              break;
             case 4:  perlin_spheres();     break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             case 5:  quads();              break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
     }
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3150,13 +2921,11 @@ First, let’s make a light emitting material. We need to add an emitted functio
 it to `hit_record` instead -- that’s a matter of design taste). Like the background, it just tells
 the ray what color it is and performs no reflection. It’s very simple:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class dielectric : public material {
         ...
     }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     class diffuse_light : public material {
       public:
         diffuse_light(shared_ptr<texture> tex) : tex(tex) {}
@@ -3176,17 +2945,14 @@ the ray what color it is and performs no reflection. It’s very simple:
 So that I don’t have to make all the non-emitting materials implement `emitted()`, I have the base
 class return black:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class material {
       public:
         virtual ~material() = default;
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         virtual color emitted(double u, double v, const point3& p) const {
             return color(0,0,0);
-        }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        }+
 
         virtual bool scatter(
             const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered
@@ -3206,16 +2972,13 @@ Next, we want a pure black background so the only light in the scene is coming f
 do this, we’ll add a background color parameter to our `ray_color` function, and pay attention to
 the new `color_from_emission` value.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class camera {
       public:
         double aspect_ratio      = 1.0;  // Ratio of image width over height
         int    image_width       = 100;  // Rendered image width in pixel count
         int    samples_per_pixel = 10;   // Count of random samples for each pixel
         int    max_depth         = 10;   // Maximum number of ray bounces into scene
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-        color  background;               // Scene background color
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        color  background;               // Scene background color+
 
         ...
 
@@ -3229,7 +2992,6 @@ the new `color_from_emission` value.
             hit_record rec;
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             // If the ray hits nothing, return the background color.
             if (!world.hit(r, interval(0.001, infinity), rec))
                 return background;
@@ -3244,7 +3006,6 @@ the new `color_from_emission` value.
             color color_from_scatter = attenuation * ray_color(scattered, depth-1, world);
 
             return color_from_emission + color_from_scatter;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3253,7 +3014,6 @@ the new `color_from_emission` value.
 <div class='together'>
 `main()` is updated to set the background color for the prior scenes:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     void bouncing_spheres() {
         ...
         camera cam;
@@ -3262,9 +3022,7 @@ the new `color_from_emission` value.
         cam.image_width       = 400;
         cam.samples_per_pixel = 100;
         cam.max_depth         = 20;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         cam.background        = color(0.70, 0.80, 1.00);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         ...
     }
 
@@ -3276,9 +3034,7 @@ the new `color_from_emission` value.
         cam.image_width       = 400;
         cam.samples_per_pixel = 100;
         cam.max_depth         = 50;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         cam.background        = color(0.70, 0.80, 1.00);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         ...
     }
 
@@ -3290,9 +3046,7 @@ the new `color_from_emission` value.
         cam.image_width       = 400;
         cam.samples_per_pixel = 100;
         cam.max_depth         = 50;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         cam.background        = color(0.70, 0.80, 1.00);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         ...
     }
 
@@ -3304,9 +3058,7 @@ the new `color_from_emission` value.
         cam.image_width       = 400;
         cam.samples_per_pixel = 100;
         cam.max_depth         = 50;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         cam.background        = color(0.70, 0.80, 1.00);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         ...
     }
 
@@ -3318,9 +3070,7 @@ the new `color_from_emission` value.
         cam.image_width       = 400;
         cam.samples_per_pixel = 100;
         cam.max_depth         = 50;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         cam.background        = color(0.70, 0.80, 1.00);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         ...
     }
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3338,7 +3088,6 @@ Turning Objects into Lights
 ----------------------------
 If we set up a rectangle as a light:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     void simple_light() {
         hittable_list world;
 
@@ -3365,21 +3114,16 @@ If we set up a rectangle as a light:
         cam.defocus_angle = 0;
 
         cam.render(world);
-    }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    }+
 
     int main() {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         switch (6) {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             case 1:  bouncing_spheres();   break;
             case 2:  checkered_spheres();  break;
             case 3:  earth();              break;
             case 4:  perlin_spheres();     break;
             case 5:  quads();              break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             case 6:  simple_light();       break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
     }
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3397,13 +3141,10 @@ Note that the light is brighter than $(1,1,1)$. This allows it to be bright enou
 
 Fool around with making some spheres lights too.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     void simple_light() {
         ...
         auto difflight = make_shared<diffuse_light>(color(4,4,4));
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         world.add(make_shared<sphere>(point3(0,7,0), 2, difflight));
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         world.add(make_shared<quad>(point3(3,1,-2), vec3(2,0,0), vec3(0,2,0), difflight));
         ...
     }
@@ -3419,7 +3160,6 @@ Creating an Empty “Cornell Box”
 The “Cornell Box” was introduced in 1984 to model the interaction of light between diffuse surfaces.
 Let’s make the 5 walls and the light of the box:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     void cornell_box() {
         hittable_list world;
 
@@ -3451,22 +3191,17 @@ Let’s make the 5 walls and the light of the box:
         cam.defocus_angle = 0;
 
         cam.render(world);
-    }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    }+
 
     int main() {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         switch (7) {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             case 1:  bouncing_spheres();   break;
             case 2:  checkered_spheres();  break;
             case 3:  earth();              break;
             case 4:  perlin_spheres();     break;
             case 5:  quads();              break;
             case 6:  simple_light();       break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             case 7:  cornell_box();        break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
     }
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3489,18 +3224,14 @@ Instances
 The Cornell Box usually has two blocks in it. These are rotated relative to the walls. First, let’s
 create a function that returns a box, by creating a `hittable_list` of six rectangles:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "hittable.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-    #include "hittable_list.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "hittable.h"
+    #include "hittable_list.h"+
 
     class quad : public hittable {
         ...
     };
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     inline shared_ptr<hittable_list> box(const point3& a, const point3& b, shared_ptr<material> mat)
     {
         // Returns the 3D box (six sides) that contains the two opposite vertices a & b.
@@ -3530,7 +3261,6 @@ create a function that returns a box, by creating a `hittable_list` of six recta
 <div class='together'>
 Now we can add two blocks (but not rotated).
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     void cornell_box() {
         ...
         world.add(make_shared<quad>(point3(555,0,0), vec3(0,555,0), vec3(0,0,555), green));
@@ -3541,10 +3271,8 @@ Now we can add two blocks (but not rotated).
         world.add(make_shared<quad>(point3(0,0,555), vec3(555,0,0), vec3(0,555,0), white));
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         world.add(box(point3(130, 0, 65), point3(295, 165, 230), white));
-        world.add(box(point3(265, 0, 295), point3(430, 330, 460), white));
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        world.add(box(point3(265, 0, 295), point3(430, 330, 460), white));+
 
         camera cam;
         ...
@@ -3586,13 +3314,11 @@ actually in the path of the incident ray. If we forgot to move the intersection 
 the intersection would be in the path of the offset ray, which isn't correct. Let's add the code to
 make this happen.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class hittable {
         ...
     };
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     class translate : public hittable {
       public:
         bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
@@ -3619,32 +3345,25 @@ make this happen.
 <div class='together'>
 ... and then flesh out the rest of the `translate` class:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class translate : public hittable {
       public:
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         translate(shared_ptr<hittable> object, const vec3& offset)
           : object(object), offset(offset)
         {
             bbox = object->bounding_box() + offset;
-        }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        }+
 
         bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
             ...
         }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
-        aabb bounding_box() const override { return bbox; }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        aabb bounding_box() const override { return bbox; }+
 
       private:
         shared_ptr<hittable> object;
         vec3 offset;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         aabb bbox;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [translate-class]: <kbd>[hittable.h]</kbd> Hittable translation class]
@@ -3655,7 +3374,6 @@ We also need to remember to offset the bounding box, otherwise the incident ray 
 the wrong place and trivially reject the intersection. The expression `object->bounding_box() +
 offset` above requires some additional support.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class aabb {
         ...
     };
@@ -3664,7 +3382,6 @@ offset` above requires some additional support.
     const aabb aabb::universe = aabb(interval::universe, interval::universe, interval::universe);
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     aabb operator+(const aabb& bbox, const vec3& offset) {
         return aabb(bbox.x + offset.x(), bbox.y + offset.y(), bbox.z + offset.z());
     }
@@ -3678,7 +3395,6 @@ offset` above requires some additional support.
 Since each dimension of an `aabb` is represented as an interval, we'll need to extend `interval`
 with an addition operator as well.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class interval {
         ...
     };
@@ -3687,7 +3403,6 @@ with an addition operator as well.
     const interval interval::universe = interval(-infinity, +infinity);
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     interval operator+(const interval& ival, double displacement) {
         return interval(ival.min + displacement, ival.max + displacement);
     }
@@ -3764,13 +3479,11 @@ rotating by $-\theta$.
 <div class='together'>
 We can now create a class for y-rotation. Let's tackle the hit function first:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class translate : public hittable {
         ...
     };
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     class rotate_y : public hittable {
       public:
 
@@ -3822,10 +3535,8 @@ We can now create a class for y-rotation. Let's tackle the hit function first:
 <div class='together'>
 ... and now for the rest of the class:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class rotate_y : public hittable {
       public:
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         rotate_y(shared_ptr<hittable> object, double angle) : object(object) {
             auto radians = degrees_to_radians(angle);
             sin_theta = std::sin(radians);
@@ -3856,15 +3567,13 @@ We can now create a class for y-rotation. Let's tackle the hit function first:
             }
 
             bbox = aabb(min, max);
-        }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        }+
 
         bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
             ...
         }
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         aabb bounding_box() const override { return bbox; }
 
       private:
@@ -3872,7 +3581,6 @@ We can now create a class for y-rotation. Let's tackle the hit function first:
         double sin_theta;
         double cos_theta;
         aabb bbox;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     };
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     [Listing [rot-y]: <kbd>[hittable.h]</kbd> Hittable rotate-Y class]
@@ -3882,13 +3590,11 @@ We can now create a class for y-rotation. Let's tackle the hit function first:
 <div class='together'>
 And the changes to Cornell are:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     void cornell_box() {
         ...
         world.add(make_shared<quad>(point3(0,0,555), vec3(555,0,0), vec3(0,555,0), white));
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         shared_ptr<hittable> box1 = box(point3(0,0,0), point3(165,330,165), white);
         box1 = make_shared<rotate_y>(box1, 15);
         box1 = make_shared<translate>(box1, vec3(265,0,295));
@@ -3897,8 +3603,7 @@ And the changes to Cornell are:
         shared_ptr<hittable> box2 = box(point3(0,0,0), point3(165,165,165), white);
         box2 = make_shared<rotate_y>(box2, -18);
         box2 = make_shared<translate>(box2, vec3(130,0,65));
-        world.add(box2);
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+        world.add(box2);+
 
         camera cam;
         ...
@@ -3951,8 +3656,7 @@ density $C$ and the boundary. I’ll use another hittable for the boundary.
 <div class='together'>
 The resulting class is:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #ifndef CONSTANT_MEDIUM_H
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ndef CONSTANT_MEDIUM_H
     #define CONSTANT_MEDIUM_H
 
     #include "hittable.h"
@@ -4023,13 +3727,11 @@ The resulting class is:
 <div class='together'>
 The scattering function of isotropic picks a uniform random direction:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
     class diffuse_light : public material {
         ...
     };
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     class isotropic : public material {
       public:
         isotropic(const color& albedo) : tex(make_shared<solid_color>(albedo)) {}
@@ -4066,13 +3768,10 @@ Rendering a Cornell Box with Smoke and Fog Boxes
 If we replace the two blocks with smoke and fog (dark and light particles), and make the light
 bigger (and dimmer so it doesn’t blow out the scene) for faster convergence:
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "bvh.h"
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "bvh.h"
     #include "camera.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     #include "constant_medium.h"
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
-    #include "hittable.h"
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ clude "hittable.h"
     #include "hittable_list.h"
     #include "material.h"
     #include "quad.h"
@@ -4082,7 +3781,6 @@ bigger (and dimmer so it doesn’t blow out the scene) for faster convergence:
     ...
 
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     void cornell_smoke() {
         hittable_list world;
 
@@ -4125,13 +3823,10 @@ bigger (and dimmer so it doesn’t blow out the scene) for faster convergence:
         cam.defocus_angle = 0;
 
         cam.render(world);
-    }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    }+
 
     int main() {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         switch (8) {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             case 1:  bouncing_spheres();   break;
             case 2:  checkered_spheres();  break;
             case 3:  earth();              break;
@@ -4139,9 +3834,7 @@ bigger (and dimmer so it doesn’t blow out the scene) for faster convergence:
             case 5:  quads();              break;
             case 6:  simple_light();       break;
             case 7:  cornell_box();        break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             case 8:  cornell_smoke();      break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
     }
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4167,7 +3860,6 @@ why we get caustics and subsurface for free. It’s a double-edged design decisi
 Also note that we'll parameterize this final scene to support a lower quality render for quick
 testing.
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
     void final_scene(int image_width, int samples_per_pixel, int max_depth) {
         hittable_list boxes1;
         auto ground = make_shared<lambertian>(color(0.48, 0.83, 0.53));
@@ -4245,13 +3937,10 @@ testing.
         cam.defocus_angle = 0;
 
         cam.render(world);
-    }
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
+    }+
 
     int main() {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
         switch (9) {
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
             case 1:  bouncing_spheres();          break;
             case 2:  checkered_spheres();         break;
             case 3:  earth();                     break;
@@ -4260,10 +3949,8 @@ testing.
             case 6:  simple_light();              break;
             case 7:  cornell_box();               break;
             case 8:  cornell_smoke();             break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++ highlight
             case 9:  final_scene(800, 10000, 40); break;
             default: final_scene(400,   250,  4); break;
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ C++
         }
     }
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

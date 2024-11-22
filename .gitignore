@@ -3,3 +3,4 @@
 .env
 MVC.ipynb
 agents/__pycache__/
+.aider*
