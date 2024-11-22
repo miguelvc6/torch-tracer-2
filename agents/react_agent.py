@@ -175,7 +175,7 @@ EXAMPLES:
 }
 """
 
-# Unified Chat API
+
 class UnifiedChatAPI:
     """Unified interface for OpenAI and Ollama chat APIs."""
 
@@ -187,6 +187,23 @@ class UnifiedChatAPI:
         self.api = self._determine_api()
         self.verbosity = verbosity
         self.date_hour = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+        # Initialize logging
+        if self.verbosity:
+            os.makedirs("logs/", exist_ok=True)
+            self.log_file = f"logs/chat_log_{self.date_hour}.json"
+            self.chat_history = {
+                "metadata": {
+                    "model": self.model,
+                    "api": self.api,
+                    "start_time": self.date_hour,
+                },
+                "interactions": [],
+            }
+        else:
+            self.log_file = None
+            self.chat_history = None
+
         if self.api == "openai":
             if not self.api_key:
                 raise ValueError(
@@ -197,12 +214,6 @@ class UnifiedChatAPI:
         elif self.api == "ollama":
             self.client = None
 
-        if self.verbosity:
-            os.makedirs("logs/", exist_ok=True)
-            self.log_file = f"logs/log_{self.date_hour}.json"
-        else:
-            self.log_file = None
-
     def _determine_api(self):
         """Determine the API based on the model name."""
         if self.model.startswith("gpt-") or self.model.startswith("o1-"):
@@ -211,28 +222,77 @@ class UnifiedChatAPI:
             return "ollama"
 
     def log_interaction(self, messages, answer):
-        """Log the interaction to the log file."""
-        with open(self.log_file, "w", encoding="utf-8") as f:
-            json_str = json.dumps(messages, indent=4)
-            json_str_with_newlines = json_str.replace("\\n", "\n")
-            f.write(json_str_with_newlines)
+        """Log the interaction to the log file with proper formatting."""
+        if not self.verbosity:
+            return
+
+        # Format the interaction
+        interaction = {
+            "timestamp": datetime.now().isoformat(),
+            "messages": self._format_messages(messages),
+            "response": self._format_response(answer),
+        }
+
+        # Add to chat history
+        self.chat_history["interactions"].append(interaction)
+
+        # Write to file with proper formatting
+        try:
+            with open(self.log_file, "w", encoding="utf-8") as f:
+                json.dump(self.chat_history, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"Error writing to log file: {e}")
+
+    def _format_messages(self, messages):
+        """Format messages for logging."""
+        formatted_messages = []
+        for msg in messages:
+            formatted_msg = {
+                "role": msg["role"],
+                "content": self._format_content(msg["content"]),
+            }
+            formatted_messages.append(formatted_msg)
+        return formatted_messages
+
+    def _format_response(self, response):
+        """Format the response for logging."""
+        return self._format_content(response)
+
+    def _format_content(self, content):
+        """Format content string with proper line breaks and escaping."""
+        if not isinstance(content, str):
+            content = str(content)
+
+        # Replace literal newlines with actual newlines while preserving formatting
+        content = content.replace("\\n", "\n")
+
+        # Remove any redundant escape characters
+        content = content.replace("\\\\", "\\")
+
+        return content
 
     def chat(self, messages):
-        """Wrapper for chat API."""
-        if self.api == "openai":
-            answer = self._openai_chat(messages)
+        """Wrapper for chat API with logging."""
+        answer = None
+        try:
+            if self.api == "openai":
+                answer = self._openai_chat(messages)
+            elif self.api == "ollama":
+                answer = self._ollama_chat(messages)
+            else:
+                raise ValueError(
+                    "Unsupported API. Please set the API to 'openai' or 'ollama'."
+                )
+
             if self.verbosity:
                 self.log_interaction(messages, answer)
+
             return answer
-        elif self.api == "ollama":
-            answer = self._ollama_chat(messages)
+
+        except Exception as e:
             if self.verbosity:
-                self.log_interaction(messages, answer)
-            return answer
-        else:
-            raise ValueError(
-                "Unsupported API. Please set the API to 'openai' or 'ollama'."
-            )
+                self.log_interaction(messages, f"Error: {str(e)}")
+            raise e
 
     def _openai_chat(self, messages):
         response = self.client.chat.completions.create(
@@ -273,7 +333,9 @@ class AgentReAct:
     # Agent Reflections
     def reflection(self, task: str) -> str:
         """Perform an agent reflection."""
-        context = self.context or "<No previous iterations have been performed>"
+        context = (
+            self.context or "<No previous iterations have been performed>"
+        )
         agent_template = f"""PREVIOUS ITERATIONS
 {context}
 
@@ -289,12 +351,12 @@ TASK
         return assistant_reply
 
     # Agent Actions
-    def action(
-        self, task: str, max_retrials: int = 3
-    ) -> AgentAction:
+    def action(self, task: str, max_retrials: int = 3) -> AgentAction:
         """Determine the next action for the agent."""
 
-        context = self.context or "<No previous iterations have been performed>"
+        context = (
+            self.context or "<No previous iterations have been performed>"
+        )
         agent_template = f"""PREVIOUS ITERATIONS
 {context}
 
@@ -338,10 +400,7 @@ TASK
             "Maximum number of retries reached without successful validation."
         )
 
-    def run_agent(
-        self, task: str
-    ) -> str:
-
+    def run_agent(self, task: str) -> str:
         while True:
             try:
                 self.perform_reflection(task)
@@ -374,25 +433,17 @@ TASK
         max_retrials: int = 3,
     ) -> AgentAction:
         """Decide on the next action and update context."""
-        action = self.action(
-            task=task, max_retrials=max_retrials
-        )
-        action_msg = self.format_message(
-            action.request, "ACTION"
-        )
+        action = self.action(task=task, max_retrials=max_retrials)
+        action_msg = self.format_message(action.request, "ACTION")
         self.context += action_msg
         if action.argument:
-            arg_msg = self.format_message(
-                action.argument, "ARGUMENT"
-            )
+            arg_msg = self.format_message(action.argument, "ARGUMENT")
             self.context += arg_msg
         os.system("cls" if os.name == "nt" else "clear")
         print(self.context)
         return action
 
-    def execute_action(
-        self, action: AgentAction, task: str
-    ) -> Optional[str]:
+    def execute_action(self, action: AgentAction, task: str) -> Optional[str]:
         """Execute the chosen action and handle the result."""
         try:
             result = None
@@ -431,17 +482,14 @@ TASK
                 raise ValueError(f"Unknown action request: {action.request}")
 
             if result is not None:
-                obs_msg = self.format_message(
-                    str(result), "OBSERVATION"
-                )
+                obs_msg = self.format_message(str(result), "OBSERVATION")
                 self.context += obs_msg
                 if large_output:
                     self.large_observations.append((obs_msg))
 
         except Exception as e:
             error_msg = self.format_message(
-                f"Error executing {action.request}: {str(e)}",
-                "ERROR"
+                f"Error executing {action.request}: {str(e)}", "ERROR"
             )
             self.context += error_msg
         return None
@@ -576,13 +624,9 @@ TASK
             return None
 
     # Final Answer Tool
-    def handle_end_task(
-        self
-    ) -> str:
+    def handle_end_task(self) -> str:
         """Handle the end task action."""
-        end_task_msg = self.format_message(
-            "Task completed.", "END OF TASK"
-        )
+        end_task_msg = self.format_message("Task completed.", "END OF TASK")
         self.context += end_task_msg
         os.system("cls" if os.name == "nt" else "clear")
         print(self.context)
