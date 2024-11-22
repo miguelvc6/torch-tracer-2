@@ -180,16 +180,16 @@ class UnifiedChatAPI:
     """Unified interface for OpenAI and Ollama chat APIs."""
 
     def __init__(
-        self, model="gpt-4o-mini", openai_api_key=None, verbosity=False
+        self, model="gpt-4o-mini", openai_api_key=None, verbose=False
     ):
         self.model = model
         self.api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
         self.api = self._determine_api()
-        self.verbosity = verbosity
+        self.verbose = verbose
         self.date_hour = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
         # Initialize logging
-        if self.verbosity:
+        if self.verbose:
             os.makedirs("logs/", exist_ok=True)
             self.log_file = f"logs/chat_log_{self.date_hour}.json"
             self.chat_history = {
@@ -223,7 +223,7 @@ class UnifiedChatAPI:
 
     def log_interaction(self, messages, answer):
         """Log the interaction to the log file with proper formatting."""
-        if not self.verbosity:
+        if not self.verbose:
             return
 
         # Format the interaction
@@ -284,13 +284,13 @@ class UnifiedChatAPI:
                     "Unsupported API. Please set the API to 'openai' or 'ollama'."
                 )
 
-            if self.verbosity:
+            if self.verbose:
                 self.log_interaction(messages, answer)
 
             return answer
 
         except Exception as e:
-            if self.verbosity:
+            if self.verbose:
                 self.log_interaction(messages, f"Error: {str(e)}")
             raise e
 
@@ -322,11 +322,11 @@ class AgentReAct:
     def __init__(
         self,
         model="gpt-4o-mini",
-        verbosity=False,
+        verbose=False,
     ):
         """Initialize Agent with model."""
         self.model = model
-        self.client = UnifiedChatAPI(model=self.model, verbosity=verbosity)
+        self.client = UnifiedChatAPI(model=self.model, verbose=verbose)
         self.context = ""
         self.large_observations = []
 
@@ -717,7 +717,7 @@ Use the same style and structure as in the currently implemented code.
     if SELECTED_MODEL == GPT_MODEL:
         agent = AgentReAct(
             model=SELECTED_MODEL,
-            verbosity=True,
+            verbose=True,
         )
         agent.run_agent(task)
         agent.save_context_to_html("agent_context_gpt.html")
@@ -725,7 +725,7 @@ Use the same style and structure as in the currently implemented code.
     elif SELECTED_MODEL == OLLAMA_MODEL:
         agent = AgentReAct(
             model=SELECTED_MODEL,
-            verbosity=True,
+            verbose=True,
         )
         agent.run_agent(task)
         agent.save_context_to_html("agent_context_ollama.html")
