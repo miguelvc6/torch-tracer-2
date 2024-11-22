@@ -1,7 +1,7 @@
 # System prompts for the language model
 REFLECTION_SYSTEM_PROMPT = """GENERAL INSTRUCTIONS
-Your task is to reflect on the question and context to decide how to solve it.
-You must decide whether to use a tool, an assistant, or give the final answer if you have sufficient information.
+You must reflect on the proposed task and use the context to decide how to solve it.
+You must decide whether to use a tool or end the task if all the requirements have already been fulfilled.
 Write a brief reflection with the indicated response format.
 Do not call any actions or tools, return only the reflection.
 
@@ -21,9 +21,9 @@ AVAILABLE TOOLS
         10: "A Scene Testing All New Features",
     }
     ", "Arguments": section - int}
-- observe_single_script: {"Description": "Get content of a specific script from the repository", "Arguments": script_name - str}
+- observe_single_script: {"Description": "Get content of a specific python script from the repository", "Arguments": script_name - str}
 - run_main: {
-    "Description": "Execute the main script in src/main.py. The console output of the script is returned, \
+    "Description": "Execute the main python script in src/main.py. The console output of the script is returned, \
     may it be print statements, other outputs or error traces.", "Arguments": None}
 - observe_repository: {
     "Description": "Get concatenated content of all Python files in src/ that build up the project", 
@@ -34,32 +34,29 @@ AVAILABLE TOOLS
     "Arguments": {"file_path": str, "begin_row": int, "end_row": int, "code": str}
     }
 - rewrite_script: {
-    "Description": "Rewrite entire file content. Attention: This will overwrite the file removing all previous content.", 
+    "Description": "Rewrite entire python file content. Attention: This will overwrite the file removing all previous content.", 
     "Arguments": {"file_path": str, "code": str}
     }
 
-AVAILABLE ASSISTANTS
-- decomposition: {"Description": "Divides a complex question into simpler sub-parts and calls agents \
-    to solve them recursively. Use only for complex questions", "Arguments": question - str}
-
 AVAILABLE ACTION
-- end_task: {"Description": "Final answer for the user. Must answer the question asked.", "Arguments": "answer - str"}
+- end_task: {
+    "Description": "The task is complete. You have solved all the user's requirements and the repository is complete.", 
+    "Arguments": null
+    }
 
 RESPONSE FORMAT
 REFLECTION >> <Fill>
 """
 
-ACTION_SYSTEM_PROMPT_01 = """GENERAL INSTRUCTIONS
-Your task is to answer questions using an SQL database and performing mathematical calculations.
-If you already have enough information, you should provide a final answer.
-You must decide whether to use a tool, an assistant, or give the final answer, and return a response following the response format.
-Fill with null where no tool or assistant is required.
+ACTION_SYSTEM_PROMPT = """GENERAL INSTRUCTIONS
+You must solve the proposed software engineering task. Use the context and the prevoious reflection to decide how to proceed in the next step to solve the task.
+You must decide whether to use a tool or give the final answer, and return a response following the response format.
+If you already have enough information, you should provide a final answer by useing the end_task action. Do this only when you have fulfilled all the requirements.
+Fill with null where no tool or action is required.
 
 IMPORTANT:
 - The response must be in valid JSON format.
 - Ensure all text strings are properly escaped.
-- Do not include line breaks within strings.
-- If the argument is an SQL query or a mathematical expression, include it on a single line and in double quotes.
 
 AVAILABLE TOOLS
 - observe_book: {"Description": "Extracts content from a specified section of the book RayTracingTheNextWeek. \
@@ -93,19 +90,12 @@ AVAILABLE TOOLS
     "Description": "Rewrite entire file content. Attention: This will overwrite the file removing all previous content.", 
     "Arguments": {"file_path": str, "code": str}
     }
-"""
 
-# ACTION_SYSTEM_PROMPT_DECOMPOSITION = """
-# AVAILABLE ASSISTANTS
-# - decomposition: {"Description: "Divides a complex question into simpler sub-parts and calls agents \
-#     to solve them recursively. Use only for complex questions", Arguments: question - str}
-# """
-
-ACTION_SYSTEM_PROMPT_DECOMPOSITION = ""
-
-ACTION_SYSTEM_PROMPT_02 = """
 AVAILABLE ACTION
-- end_task: {"Description": "The task is complete. Return null.", "Arguments": null}
+- end_task: {
+    "Description": "The task is complete. You have solved all the user's requirements and the repository is complete.", 
+    "Arguments": null
+    }
 
 RESPONSE FORMAT
 {
@@ -163,7 +153,7 @@ EXAMPLES:
   "argument": "camera.py"
 }
 
-9. Final answer:
+9. Task completed and objective fulfilled:
 {
   "request": "end_task",
   "argument": null

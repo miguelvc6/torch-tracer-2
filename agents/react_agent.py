@@ -11,9 +11,7 @@ import ollama
 import openai
 from ansi2html import Ansi2HTMLConverter
 from prompts import (
-    ACTION_SYSTEM_PROMPT_01,
-    ACTION_SYSTEM_PROMPT_02,
-    ACTION_SYSTEM_PROMPT_DECOMPOSITION,
+    ACTION_SYSTEM_PROMPT,
     REFLECTION_SYSTEM_PROMPT,
 )
 from pydantic import BaseModel, ValidationError
@@ -89,33 +87,6 @@ class UnifiedChatAPI:
         return response["message"]["content"]
 
 
-class SimpleMemory:
-    """Simple in-memory storage for task and answer traces."""
-
-    def __init__(
-        self, task_trace: List[str] = [], answer_trace: List[str] = []
-    ):
-        self.task_trace = task_trace
-        self.answer_trace = answer_trace
-
-    def add_interaction(self, task, answer):
-        self.task_trace.append(task)
-        self.answer_trace.append(answer)
-
-    def get_context(self):
-        if not self.task_trace:
-            return ""
-        else:
-            context_lines = [
-                "Here are the tasks and answers from the previous interactions.",
-                "Use them to answer the current task if they are relevant:",
-            ]
-            for q, a in zip(self.task_trace, self.answer_trace):
-                context_lines.append(f"TASK: {q}")
-                context_lines.append(f"ANSWER: {a}")
-            return "\n".join(context_lines)
-
-
 # Pydantic Models for output validation
 class DecomposedQuestion(BaseModel):
     sub_tasks: List[str]
@@ -133,47 +104,19 @@ class AgentReAct:
     def __init__(
         self,
         model="gpt-4o-mini",
-        memory_path="agent_memory.json",
-        verbosity=0,
+        verbosity=False,
     ):
         """Initialize Agent with database path and model."""
         self.model = model
         self.client = UnifiedChatAPI(model=self.model, verbosity=verbosity)
         self.context = ""
-        self.memory_path = memory_path
         self.large_observations = []
-        self.memory = self.load_memory()
-
-    # Memory Management
-    def load_memory(self):
-        """Load the agent memory from a JSON file."""
-        if os.path.exists(self.memory_path):
-            with open(self.memory_path, "r", encoding="utf-8") as f:
-                memory = json.load(f)
-                return SimpleMemory(
-                    task_trace=memory["task_trace"],
-                    answer_trace=memory["answer_trace"],
-                )
-        else:
-            return SimpleMemory()
-
-    def save_memory(self):
-        """Save the agent memory to a JSON file."""
-        with open(self.memory_path, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "task_trace": self.memory.task_trace,
-                    "answer_trace": self.memory.answer_trace,
-                },
-                f,
-                indent=4,
-            )
 
     # Agent Reflections
     def reflection(self, task: str) -> str:
         """Perform an agent reflection."""
-        context = self.context or "<No previous tasks have been asked>"
-        agent_template = f"""CONTEXTUAL INFORMATION
+        context = self.context or "<No previous iterations have been performed>"
+        agent_template = f"""PREVIOUS ITERATIONS
 {context}
 
 TASK
@@ -189,17 +132,12 @@ TASK
 
     # Agent Actions
     def action(
-        self, task: str, recursion=False, max_retrials: int = 3
+        self, task: str, max_retrials: int = 3
     ) -> AgentAction:
         """Determine the next action for the agent."""
-        action_system_prompt = (
-            ACTION_SYSTEM_PROMPT_01
-            + (not recursion) * ACTION_SYSTEM_PROMPT_DECOMPOSITION
-            + ACTION_SYSTEM_PROMPT_02
-        )
 
-        context = self.context or "<No previous tasks have been asked>"
-        agent_template = f"""CONTEXTUAL INFORMATION
+        context = self.context or "<No previous iterations have been performed>"
+        agent_template = f"""PREVIOUS ITERATIONS
 {context}
 
 TASK
@@ -208,7 +146,7 @@ TASK
         for attempt in range(max_retrials):
             assistant_reply = self.client.chat(
                 [
-                    {"role": "system", "content": action_system_prompt},
+                    {"role": "system", "content": ACTION_SYSTEM_PROMPT},
                     {"role": "user", "content": agent_template},
                 ]
             )
@@ -243,22 +181,14 @@ TASK
         )
 
     def run_agent(
-        self, task: str, recursion: bool = False, indent_level: int = 0
+        self, task: str
     ) -> str:
-        """Run the ReAct agent to solve a task."""
-        if (
-            not recursion
-            and self.memory.task_trace
-            and self.memory.answer_trace
-        ):
-            self.context = self.memory.get_context()
-            print("\n")
 
         while True:
             try:
-                self.perform_reflection(task, indent_level)
-                action = self.decide_action(task, recursion, indent_level)
-                result = self.execute_action(action, task, indent_level)
+                self.perform_reflection(task)
+                action = self.decide_action(task)
+                result = self.execute_action(action, task)
 
                 if result == "end_task":
                     break
@@ -267,37 +197,35 @@ TASK
                     pass
 
             except Exception as e:
-                error_msg = self.format_message(str(e), "ERROR", indent_level)
+                error_msg = self.format_message(str(e), "ERROR")
                 self.context += error_msg
                 break
 
     # Helper Methods
-    def perform_reflection(self, task: str, indent_level: int):
+    def perform_reflection(self, task: str):
         """Perform reflection and update context."""
         reflection = self.reflection(task=task)
         reflection_msg = self.format_message(
-            reflection.split(">> ")[1], "REFLECTION", indent_level
+            reflection.split(">> ")[1], "REFLECTION"
         )
         self.context += reflection_msg
 
     def decide_action(
         self,
         task: str,
-        recursion: bool,
-        indent_level: int,
         max_retrials: int = 3,
     ) -> AgentAction:
         """Decide on the next action and update context."""
         action = self.action(
-            task=task, recursion=recursion, max_retrials=max_retrials
+            task=task, max_retrials=max_retrials
         )
         action_msg = self.format_message(
-            action.request, "ACTION", indent_level
+            action.request, "ACTION"
         )
         self.context += action_msg
         if action.argument:
             arg_msg = self.format_message(
-                action.argument, "ARGUMENT", indent_level
+                action.argument, "ARGUMENT"
             )
             self.context += arg_msg
         os.system("cls" if os.name == "nt" else "clear")
@@ -305,7 +233,7 @@ TASK
         return action
 
     def execute_action(
-        self, action: AgentAction, task: str, indent_level: int
+        self, action: AgentAction, task: str
     ) -> Optional[str]:
         """Execute the chosen action and handle the result."""
         try:
@@ -338,82 +266,27 @@ TASK
             elif action.request == "rewrite_script":
                 args = json.loads(action.argument)
                 result = self.rewrite_script(args["file_path"], args["code"])
-            elif action.request == "decomposition":
-                self.handle_decomposition(action, indent_level)
-                return None
             elif action.request == "end_task":
-                self.handle_end_task(task, action, indent_level)
+                self.handle_end_task(task, action)
                 return "end_task"
             else:
                 raise ValueError(f"Unknown action request: {action.request}")
 
             if result is not None:
                 obs_msg = self.format_message(
-                    str(result), "OBSERVATION", indent_level
+                    str(result), "OBSERVATION"
                 )
                 self.context += obs_msg
                 if large_output:
-                    self.large_observations.append((obs_msg, indent_level))
+                    self.large_observations.append((obs_msg))
 
         except Exception as e:
             error_msg = self.format_message(
                 f"Error executing {action.request}: {str(e)}",
-                "ERROR",
-                indent_level,
+                "ERROR"
             )
             self.context += error_msg
         return None
-
-    def handle_decomposition(self, action: AgentAction, indent_level: int):
-        """Handle the decomposition action."""
-        result = self.decompose_task(task=action.argument)
-        obs_msg = self.format_message(str(result), "OBSERVATION", indent_level)
-        self.context += obs_msg
-
-        # Answer subtasks recursively
-        answers = []
-        for subtask in result.sub_tasks:
-            subq_msg = self.format_message(subtask, "SUBTASK", indent_level)
-            self.context += subq_msg
-            # Run agent recursively
-            answer = self.run_agent(
-                subtask,
-                recursion=True,
-                indent_level=min(indent_level + 1, 3),
-            )
-            answers.append(answer)
-
-    # Assistants
-    def decompose_task(
-        self, task: str, max_retrials: int = 3
-    ) -> DecomposedQuestion:
-        """Decompose a complex task into simpler parts."""
-        decomp_system_prompt = """GENERAL INSTRUCTIONS
-You are an expert in the domain of the following task. Your task is to decompose a complex task into simpler parts.
-
-RESPONSE FORMAT
-{"sub_tasks":["<FILL>"]}"""
-
-        for attempt in range(max_retrials):
-            assistant_reply = self.client.chat(
-                [
-                    {"role": "system", "content": decomp_system_prompt},
-                    {"role": "user", "content": task},
-                ]
-            )
-
-            try:
-                response_content = json.loads(assistant_reply)
-                validated_response = DecomposedQuestion.model_validate(
-                    response_content
-                )
-                return validated_response
-            except (json.JSONDecodeError, ValidationError) as e:
-                print(f"Validation error on attempt {attempt + 1}: {e}")
-
-        raise RuntimeError(
-            "Maximum number of retries reached without successful validation."
-        )
 
     # Tools
     def observe_book(self, section: int) -> Optional[str]:
@@ -546,27 +419,22 @@ RESPONSE FORMAT
 
     # Final Answer Tool
     def handle_end_task(
-        self, task: str, action: AgentAction, indent_level: int
+        self
     ) -> str:
         """Handle the end task action."""
-        self.memory.add_interaction(task, action.argument)
         end_task_msg = self.format_message(
-            "Task completed.", "END OF TASK", indent_level
+            "Task completed.", "END OF TASK"
         )
         self.context += end_task_msg
         os.system("cls" if os.name == "nt" else "clear")
         print(self.context)
 
     # Formatting
-    def format_message(self, text: str, action: str, indent_level: int) -> str:
+    def format_message(self, text: str, action: str) -> str:
         """Format messages with indentation and color."""
-        indent = "    " * indent_level
         colored_action = self.color_text(f"{action} >> ", action)
         wrapped_text = textwrap.fill(text, width=100)
-        indented_text = textwrap.indent(
-            wrapped_text, "    " * (indent_level + 1)
-        )
-        return f"{indent}{colored_action}{indented_text}\n"
+        return f"{colored_action}{wrapped_text}\n"
 
     def color_text(self, text: str, action: str) -> str:
         """Colorize text based on the action."""
@@ -575,10 +443,8 @@ RESPONSE FORMAT
             "ACTION": "\033[92m",
             "OBSERVATION": "\033[93m",
             "ERROR": "\033[91m",
-            "SUBTASK": "\033[95m",
             "END OF TASK": "\033[96m",
             "ARGUMENT": "\033[90m",
-            "GENERATED RESPONSE TO SUBTASKS": "\033[96m",
             "SUMMARY": "\033[97m",
         }
         reset_code = "\033[0m"
@@ -596,9 +462,9 @@ RESPONSE FORMAT
 
     def summarize_large_observations(self):
         """Summarize large observations for context management."""
-        for obs_msg, indent_level in self.large_observations:
+        for obs_msg in self.large_observations:
             summary = self.summarize_text(obs_msg)
-            summary_msg = self.format_message(summary, "SUMMARY", indent_level)
+            summary_msg = self.format_message(summary, "SUMMARY")
             self.context = self.context.replace(obs_msg, summary_msg)
         self.large_observations.clear()
 
