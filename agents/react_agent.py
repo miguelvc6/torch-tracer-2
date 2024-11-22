@@ -410,8 +410,8 @@ TASK
                 if result == "end_task":
                     break
                 elif result is not None:
-                    self.summarize_large_observations()
-                    pass
+                    # self.summarize_large_observations()
+                    continue
 
             except Exception as e:
                 error_msg = self.format_message(str(e), "ERROR")
@@ -701,16 +701,17 @@ if __name__ == "__main__":
     SELECTED_MODEL = GPT_MODEL
 
     task = """
-I have an implementation of the ray tracer algorithm in PyTorch.
+I have an implementation of the ray tracer algorithm in PyTorch. \
 It is based on the book 'Ray Tracing In One Weekend', where the code is written in C++.
 
-I want you to augment my code with additional features as described in the book 'Ray Tracing The Next Week', 
+I want you to augment my code with additional features as described in the book 'Ray Tracing The Next Week', \
 the second book of the series. You will be evaluated on the completeness and correctness of the implementation.
-At the end of the task, I will personally review the code and evaluate your work. The nine scenes that are rendered
+
+At the end of the task, I will personally review the code and evaluate your work. The nine scenes that are rendered \
 in the book must be rendered correctly.
 
-I recommend you to start the task by using the observe_repository tool to get a view of the current code.
-Then you need you should start implementing the code of the book's sections sequentially.
+I recommend you to start the task by using the observe_repository tool to get a view of the current code. \
+Then you need you should start implementing the code of the book's sections sequentially. \
 Use the same style and structure as in the currently implemented code.
 """
 
