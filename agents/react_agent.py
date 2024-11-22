@@ -47,10 +47,13 @@ AVAILABLE TOOLS
 - observe_repository: {
     "Description": "Get concatenated content of all Python files in src/ that build up the project", 
     "Arguments": None}
-- insert_code: {"Description": "Insert code at specific row in a python script", "Arguments": {"file_path": str, "row": int, "code": str}}
-- modify_code: {
-    "Description": "Modify code between specific rows in a python script", 
-    "Arguments": {"file_path": str, "begin_row": int, "end_row": int, "code": str}
+- edit_code: {
+    "Description": "Edit code by replacing a specific code block with a new one using a diff-like approach", 
+    "Arguments": {"file_path": str, "original_block": str, "new_block": str}
+    }
+- insert_code_block: {
+    "Description": "Insert a new code block before or after a specific anchor block of code", 
+    "Arguments": {"file_path": str, "anchor_block": str, "new_block": str, "position": str}
     }
 - rewrite_script: {
     "Description": "Rewrite entire python file content. Attention: This will overwrite the file removing all previous content.", 
@@ -100,10 +103,13 @@ AVAILABLE TOOLS
 - observe_repository: {
     "Description": "Get concatenated content of all Python files in src/ that build up the project", 
     "Arguments": None}
-- insert_code: {"Description": "Insert code at specific row in a python script", "Arguments": {"file_path": str, "row": int, "code": str}}
-- modify_code: {
-    "Description": "Modify code between specific rows in a python script", 
-    "Arguments": {"file_path": str, "begin_row": int, "end_row": int, "code": str}
+- edit_code: {
+    "Description": "Edit code by replacing a specific code block with a new one using a diff-like approach", 
+    "Arguments": {"file_path": str, "original_block": str, "new_block": str}
+    }
+- insert_code_block: {
+    "Description": "Insert a new code block before or after a specific anchor block of code", 
+    "Arguments": {"file_path": str, "anchor_block": str, "new_block": str, "position": str}
     }
 - rewrite_script: {
     "Description": "Rewrite entire file content. Attention: This will overwrite the file removing all previous content.", 
@@ -136,10 +142,10 @@ EXAMPLES:
   "argument": null
 }
 
-3. Using modify_code with file path and row numbers:
+3. Using edit_code to modify existing code:
 {
-  "request": "modify_code",
-  "argument": "{\"file_path\": \"src/main.py\", \"begin_row\": 10, \"end_row\": 15, \"code\": \"def new_function():\\n    return True\\n\"}"
+  "request": "edit_code",
+  "argument": "{\"file_path\": \"src/utils.py\", \"original_block\": \"def old_method():\\n    pass\", \"new_block\": \"def old_method():\\n    return True\"}"
 }
 
 4. Using observe_repository without arguments:
@@ -148,10 +154,10 @@ EXAMPLES:
   "argument": null
 }
 
-5. Using insert_code to add new code:
+5. Using insert_code_block to add new code:
 {
-  "request": "insert_code",
-  "argument": "{\"file_path\": \"src/camera.py\", \"row\": 25, \"code\": \"    def get_focal_length(self):\\n        return self._focal_length\\n\"}"
+  "request": "insert_code_block",
+  "argument": "{\"file_path\": \"src/camera.py\", \"anchor_block\": \"def get_focal_length(self):\\n    return self._focal_length\", \"new_block\": \"def new_method(self):\\n    pass\", \"position\": \"after\"}"
 }
 
 6. Using rewrite_script to replace entire file:
@@ -463,18 +469,20 @@ TASK
             elif action.request == "observe_single_script":
                 result = self.observe_single_script(action.argument)
                 large_output = True
-            elif action.request == "insert_code":
+            elif action.request == "edit_code":
                 args = json.loads(action.argument)
-                result = self.insert_code(
-                    args["file_path"], args["row"], args["code"]
-                )
-            elif action.request == "modify_code":
-                args = json.loads(action.argument)
-                result = self.modify_code(
+                result = self.edit_code(
                     args["file_path"],
-                    args["begin_row"],
-                    args["end_row"],
-                    args["code"],
+                    args["original_block"],
+                    args["new_block"],
+                )
+            elif action.request == "insert_code_block":
+                args = json.loads(action.argument)
+                result = self.insert_code_block(
+                    args["file_path"],
+                    args["anchor_block"],
+                    args["new_block"],
+                    args["position"],
                 )
             elif action.request == "rewrite_script":
                 args = json.loads(action.argument)
